@@ -5,7 +5,9 @@ import {
   useHMSStore, 
   selectPeers,
   selectDominantSpeaker,
-  HMSPeer
+  HMSPeer,
+  selectIsPeerAudioEnabled,
+  selectIsPeerVideoEnabled
 } from "@100mslive/react-sdk";
 
 interface ParticipantsProps {
@@ -29,29 +31,34 @@ const Participants = ({ onClose }: ParticipantsProps) => {
         {peers.length === 0 ? (
           <p className="text-center py-8 text-gray-500 dark:text-gray-400">Aucun participant pour le moment</p>
         ) : (
-          peers.map((peer) => (
-            <div 
-              key={peer.id} 
-              className={`flex items-center p-3 rounded-md ${
-                dominantSpeaker?.id === peer.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-              }`}
-            >
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold mr-3">
-                {peer.name.charAt(0).toUpperCase()}
+          peers.map((peer) => {
+            const isAudioEnabled = useHMSStore(selectIsPeerAudioEnabled(peer.id));
+            const isVideoEnabled = useHMSStore(selectIsPeerVideoEnabled(peer.id));
+            
+            return (
+              <div 
+                key={peer.id} 
+                className={`flex items-center p-3 rounded-md ${
+                  dominantSpeaker?.id === peer.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold mr-3">
+                  {peer.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium dark:text-white">{peer.name} {peer.isLocal ? ' (Vous)' : ''}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {isAudioEnabled ? 'Micro activé' : 'Micro désactivé'}
+                    {' • '}
+                    {isVideoEnabled ? 'Caméra activée' : 'Caméra désactivée'}
+                  </p>
+                </div>
+                {dominantSpeaker?.id === peer.id && (
+                  <div className="w-3 h-3 bg-green-500 rounded-full ml-2" />
+                )}
               </div>
-              <div className="flex-1">
-                <p className="font-medium dark:text-white">{peer.name} {peer.isLocal ? ' (Vous)' : ''}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {peer.audioEnabled ? 'Micro activé' : 'Micro désactivé'}
-                  {' • '}
-                  {peer.videoEnabled ? 'Caméra activée' : 'Caméra désactivée'}
-                </p>
-              </div>
-              {dominantSpeaker?.id === peer.id && (
-                <div className="w-3 h-3 bg-green-500 rounded-full ml-2" />
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

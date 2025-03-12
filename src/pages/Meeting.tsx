@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
@@ -17,7 +16,8 @@ import {
   selectLocalPeer,
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
-  HMSRoomProvider
+  HMSRoomProvider,
+  selectIsPeerAudioEnabled
 } from "@100mslive/react-sdk";
 
 const MeetingContent = () => {
@@ -155,16 +155,20 @@ const MeetingContent = () => {
                       <p className="text-gray-500 dark:text-gray-400">Aucun participant pour le moment</p>
                     </div>
                   ) : (
-                    peers.map(peer => (
-                      <div key={peer.id} className="aspect-video">
-                        <VideoTile
-                          peerId={peer.id}
-                          peerName={peer.name}
-                          isLocal={peer.isLocal}
-                          isAudioEnabled={peer.audioEnabled}
-                        />
-                      </div>
-                    ))
+                    peers.map(peer => {
+                      const isPeerAudioEnabled = useHMSStore(selectIsPeerAudioEnabled(peer.id));
+                      
+                      return (
+                        <div key={peer.id} className="aspect-video">
+                          <VideoTile
+                            peerId={peer.id}
+                            peerName={peer.name}
+                            isLocal={peer.isLocal}
+                            isAudioEnabled={isPeerAudioEnabled}
+                          />
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
