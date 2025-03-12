@@ -2,7 +2,7 @@
 import { useRef, useEffect } from "react";
 import { 
   useHMSStore, 
-  selectCameraStreamByPeerID,
+  selectVideoTrackByPeerID,
   selectScreenShareByPeerID
 } from "@100mslive/react-sdk";
 import { Mic, MicOff } from "lucide-react";
@@ -25,14 +25,16 @@ const VideoTile = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrack = useHMSStore(isScreenShare 
     ? selectScreenShareByPeerID(peerId) 
-    : selectCameraStreamByPeerID(peerId));
+    : selectVideoTrackByPeerID(peerId));
 
   useEffect(() => {
     if (videoRef.current && videoTrack) {
       if (videoTrack.enabled) {
         const videoElement = videoRef.current;
-        if (videoElement.srcObject !== videoTrack.track) {
-          videoElement.srcObject = new MediaStream([videoTrack.track]);
+        if (videoElement.srcObject !== videoTrack.trackId) {
+          const mediaStream = new MediaStream();
+          mediaStream.addTrack(videoTrack.trackId);
+          videoElement.srcObject = mediaStream;
         }
       }
     }

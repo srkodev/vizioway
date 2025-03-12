@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
@@ -31,16 +30,15 @@ const MeetingContent = () => {
   useEffect(() => {
     if (!roomId) return;
     
-    // Pour une démonstration, nous utilisons un token fictif
-    // Dans un environnement de production, vous devriez obtenir ce token de votre serveur
-    const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3Nfa2V5IjoiNjFmMWYxNGFkYWJkNzc5YzlkYjFjZWIxIiwicm9vbV9pZCI6IjYxZjFmMWVkZGFiZDc3MzA3N2IxY2ViMiIsInVzZXJfaWQiOiJ1c2VyXzEiLCJyb2xlIjoiaG9zdCIsImlhdCI6MTY0MzI2NTUxNywiZXhwIjoxNjQzMzUxOTE3LCJqdGkiOiJiMjJiYjkwNi1mMzg0LTRmMzctOTMzZC03ZjU2OGRjY2JlYmUifQ.BJ-WKjNYMlkotDVxM5wVT50FQxvWO74jhRXoYjA35gY";
-    
     const joinRoom = async () => {
       try {
         await hmsActions.join({
           userName: user?.firstName || 'Invité',
-          authToken: mockToken,
-          roomId: roomId
+          authToken: "votre_token_100ms",
+          settings: {
+            isAudioMuted: true,
+            isVideoMuted: false,
+          }
         });
         
         toast.success("Vous avez rejoint la réunion");
@@ -78,7 +76,6 @@ const MeetingContent = () => {
       <main className="pt-16 flex-1 flex">
         <div className="flex-1 flex flex-col p-4">
           <div className="flex-1 flex flex-col lg:flex-row gap-4">
-            {/* Grille vidéo principale */}
             <div className="flex-1 bg-white rounded-lg shadow p-4 h-full">
               {!isConnected ? (
                 <div className="h-full flex items-center justify-center">
@@ -106,7 +103,6 @@ const MeetingContent = () => {
               )}
             </div>
             
-            {/* Panneau latéral (chat ou participants) */}
             {(isChatOpen || isParticipantsOpen) && (
               <div className="w-full lg:w-80 h-80 lg:h-auto">
                 {isChatOpen && <Chat onClose={toggleChat} />}
@@ -115,7 +111,6 @@ const MeetingContent = () => {
             )}
           </div>
           
-          {/* Contrôles de la réunion */}
           <div className="bg-white rounded-lg shadow p-4 mt-4">
             <MeetingControls 
               onChatToggle={toggleChat}

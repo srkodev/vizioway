@@ -38,9 +38,9 @@ const Participants = ({ onClose }: ParticipantsProps) => {
             <div className="flex-1">
               <p className="font-medium">{peer.name} {peer.isLocal ? ' (Vous)' : ''}</p>
               <p className="text-xs text-gray-500">
-                {peer.audioTrack ? (peer.audioTrack.enabled ? 'Micro activé' : 'Micro désactivé') : 'Pas d\'audio'}
+                {peer.audioTrack?.enabled ? 'Micro activé' : 'Micro désactivé'}
                 {' • '}
-                {peer.videoTrack ? (peer.videoTrack.enabled ? 'Caméra activée' : 'Caméra désactivée') : 'Pas de vidéo'}
+                {peer.videoTrack?.enabled ? 'Caméra activée' : 'Caméra désactivée'}
               </p>
             </div>
             {dominantSpeaker?.id === peer.id && (

@@ -1,12 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   useHMSActions, 
   useHMSStore, 
-  selectHMSMessages,
-  selectPeerNameByID
+  selectHMSMessages
 } from "@100mslive/react-sdk";
 
 interface ChatProps {
@@ -28,7 +26,6 @@ const Chat = ({ onClose }: ChatProps) => {
   };
 
   useEffect(() => {
-    // Scroll au dernier message
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -53,7 +50,7 @@ const Chat = ({ onClose }: ChatProps) => {
               sender={msg.senderName} 
               text={msg.message}
               time={new Date(msg.time).toLocaleTimeString()}
-              isFromMe={msg.isSentByMe}
+              isFromMe={msg.sender === msg.senderUserId}
             />
           ))
         )}
