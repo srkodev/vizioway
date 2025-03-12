@@ -37,7 +37,7 @@ const Index = () => {
         <Header appName="Vizioway" />
         <main className="pt-24 container mx-auto px-4 pb-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6 app-name">
               Vizioway
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
@@ -84,7 +84,7 @@ const Index = () => {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
           <div className="max-w-md w-full px-6 py-8">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-4" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
+              <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-4 app-name">
                 Vizioway
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
