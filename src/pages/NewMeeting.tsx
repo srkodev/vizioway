@@ -2,28 +2,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
+import { toast } from "sonner";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { apiClient } from "@/utils/api";
 
 const NewMeeting = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
 
   const createMeeting = async () => {
     try {
       setIsCreating(true);
-      const meetingId = `${Math.random().toString(36).substr(2, 9)}`;
-      // Ici nous simulerons la création d'une réunion pour le moment
-      // Dans une version future, nous ajouterons l'intégration complète avec 100ms
-      navigate(`/meeting/${meetingId}`);
+      // Utiliser notre API pour créer une nouvelle réunion
+      const roomData = await apiClient.createRoom();
+      navigate(`/meeting/${roomData.roomId}`);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de créer la réunion pour le moment.",
-      });
+      console.error("Erreur lors de la création de la réunion:", error);
+      toast.error("Impossible de créer la réunion pour le moment.");
     } finally {
       setIsCreating(false);
     }

@@ -16,14 +16,20 @@ const Participants = ({ onClose }: ParticipantsProps) => {
   const peers = useHMSStore(selectPeers);
   const dominantSpeaker = useHMSStore(selectDominantSpeaker);
 
+  // Fonction sécurisée pour vérifier l'état du micro
   const getAudioStatus = (peer: HMSPeer) => {
     if (!peer.audioTrack) return false;
-    return typeof peer.audioTrack === 'string' ? false : peer.audioTrack.enabled;
+    if (typeof peer.audioTrack === 'string') return false;
+    if (typeof peer.audioTrack.enabled !== 'boolean') return false;
+    return peer.audioTrack.enabled;
   };
 
+  // Fonction sécurisée pour vérifier l'état de la caméra
   const getVideoStatus = (peer: HMSPeer) => {
     if (!peer.videoTrack) return false;
-    return typeof peer.videoTrack === 'string' ? false : peer.videoTrack.enabled;
+    if (typeof peer.videoTrack === 'string') return false;
+    if (typeof peer.videoTrack.enabled !== 'boolean') return false;
+    return peer.videoTrack.enabled;
   };
 
   return (

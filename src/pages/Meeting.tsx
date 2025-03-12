@@ -9,6 +9,7 @@ import MeetingControls from "@/components/MeetingControls";
 import VideoTile from "@/components/VideoTile";
 import Chat from "@/components/Chat";
 import Participants from "@/components/Participants";
+import { apiClient } from "@/utils/api";
 import { 
   useHMSActions, 
   useHMSStore, 
@@ -17,6 +18,13 @@ import {
   HMSRoomProvider,
   HMSPeer
 } from "@100mslive/react-sdk";
+
+// Type de sécurité pour le participant local
+interface LocalParticipant {
+  id: string;
+  roomId: string;
+  token: string;
+}
 
 const MeetingContent = () => {
   const { id: roomId } = useParams();
@@ -28,17 +36,33 @@ const MeetingContent = () => {
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+  const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!roomId) return;
     
     const joinRoom = async () => {
       try {
+        setIsLoading(true);
+        
+        // Obtenir un token depuis notre backend
+        const joinResponse = await apiClient.joinRoom(
+          roomId, 
+          user?.firstName || 'Invité'
+        );
+        
+        // Stocker les infos du participant local
+        setLocalParticipant({
+          id: joinResponse.participantId,
+          roomId,
+          token: joinResponse.token
+        });
+        
+        // Connecter à 100ms avec le token fourni par notre backend
         await hmsActions.join({
           userName: user?.firstName || 'Invité',
-          // Nous ne nécessitons plus de token pour rejoindre la salle
-          // Cela signifie que nous créons une expérience simulée
-          authToken: process.env.NODE_ENV === 'development' ? 'dev-token' : 'dummy-token',
+          authToken: joinResponse.token,
           settings: {
             isAudioMuted: true,
             isVideoMuted: false,
@@ -50,18 +74,39 @@ const MeetingContent = () => {
         console.error("Error joining room:", error);
         toast.error("Impossible de rejoindre la réunion");
         
-        // En cas d'échec, nous simulerons tout de même une connexion
-        // pour des fins de démonstration
-        console.log("Simulation d'une connexion à la salle de réunion");
+        // En mode développement, nous simulons une connexion
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Simulation d'une connexion à la salle de réunion");
+          setLocalParticipant({
+            id: 'local-user-id',
+            roomId: roomId || '',
+            token: 'simulated-token'
+          });
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
     
     joinRoom();
     
     return () => {
-      if (isConnected) {
-        hmsActions.leave();
-      }
+      // Déconnexion lorsque le composant est démonté
+      const leaveRoom = async () => {
+        if (isConnected) {
+          await hmsActions.leave();
+        }
+        
+        // Informer le backend que nous quittons la salle
+        if (localParticipant) {
+          await apiClient.leaveRoom(
+            localParticipant.roomId,
+            localParticipant.id
+          );
+        }
+      };
+      
+      leaveRoom();
     };
   }, [roomId, hmsActions, navigate, user, isConnected]);
 
@@ -92,9 +137,16 @@ const MeetingContent = () => {
         <div className="flex-1 flex flex-col p-4">
           <div className="flex-1 flex flex-col lg:flex-row gap-4">
             <div className="flex-1 bg-white rounded-lg shadow p-4 h-full">
-              {!isConnected ? (
+              {isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-gray-500">Connexion à la réunion...</p>
+                </div>
+              ) : !isConnected ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-gray-500">
+                    Connexion à la réunion...
+                    {process.env.NODE_ENV === 'development' && ' (Mode simulation)'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">

@@ -1,11 +1,9 @@
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { 
   useHMSStore, 
   selectVideoTrackByPeerID,
-  selectLocalVideoTrackID,
-  selectVideoTrackByID,
-  HMSVideoTrack
+  HMSPeer
 } from "@100mslive/react-sdk";
 import { Mic, MicOff } from "lucide-react";
 
@@ -26,39 +24,44 @@ const VideoTile = ({
 }: VideoTileProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrack = useHMSStore(selectVideoTrackByPeerID(peerId));
+  const [videoEnabled, setVideoEnabled] = useState(false);
   
   useEffect(() => {
-    if (videoRef.current && videoTrack && videoTrack.enabled) {
+    // Vérifier si la vidéo est activée de manière sécurisée
+    if (videoTrack && typeof videoTrack !== 'string') {
+      setVideoEnabled(typeof videoTrack.enabled === 'boolean' ? videoTrack.enabled : false);
+    } else {
+      setVideoEnabled(false);
+    }
+    
+    if (videoRef.current && videoTrack && typeof videoTrack !== 'string' && videoTrack.enabled) {
       try {
         const videoElement = videoRef.current;
         
-        if (videoTrack && !videoElement.srcObject) {
-          const mediaStream = new MediaStream();
-          
-          // Utilisation d'une approche sécurisée pour obtenir la MediaStreamTrack
-          if (videoTrack.id) {
-            // Si nous avons un ID de piste, nous pouvons l'utiliser directement
-            const track = videoTrack.enabled && videoTrack.id ? 
-              navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => stream.getVideoTracks()[0])
-                .catch(e => {
-                  console.error("Could not get video track:", e);
-                  return null;
-                }) : null;
-                
-            if (track) {
-              Promise.resolve(track).then(actualTrack => {
-                mediaStream.addTrack(actualTrack);
-                videoElement.srcObject = mediaStream;
-              });
-            }
+        // Pour les besoins de simulation, nous pouvons créer un flux fictif
+        if (process.env.NODE_ENV === 'development') {
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+              videoElement.srcObject = stream;
+              videoElement.play().catch(e => console.error("Error playing video:", e));
+            })
+            .catch(e => {
+              console.error("Could not get video:", e);
+            });
+        } else if (typeof videoTrack.getMediaTrack === 'function') {
+          // Utilisation de 100ms pour obtenir le flux
+          const track = videoTrack.getMediaTrack();
+          if (track) {
+            const mediaStream = new MediaStream([track]);
+            videoElement.srcObject = mediaStream;
+            videoElement.play().catch(e => console.error("Error playing video:", e));
           }
         }
       } catch (error) {
         console.error("Error attaching video track:", error);
       }
     }
-  }, [videoTrack]);
+  }, [videoTrack, peerId]);
 
   return (
     <div className="relative rounded-lg overflow-hidden bg-gray-800 w-full h-full">
@@ -67,10 +70,10 @@ const VideoTile = ({
         autoPlay
         playsInline
         muted={isLocal || !isAudioEnabled}
-        className={`w-full h-full object-cover ${videoTrack && videoTrack.enabled ? '' : 'hidden'}`}
+        className={`w-full h-full object-cover ${videoEnabled ? '' : 'hidden'}`}
       />
 
-      {(!videoTrack || !videoTrack.enabled) && (
+      {!videoEnabled && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800 text-white">
           <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold">
             {peerName.charAt(0).toUpperCase()}
