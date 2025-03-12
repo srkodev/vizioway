@@ -1,18 +1,16 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import LoginForm from "@/components/LoginForm";
 import { v4 as uuidv4 } from "uuid";
 
 const Index = () => {
   const [meetingCode, setMeetingCode] = useState("");
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
 
   const handleJoinMeeting = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +28,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {isAuthenticated ? (
+      <SignedIn>
         <>
           <Header appName="Vizioway" />
           <main className="pt-24 container mx-auto px-4 pb-12">
@@ -78,7 +76,8 @@ const Index = () => {
             </div>
           </main>
         </>
-      ) : (
+      </SignedIn>
+      <SignedOut>
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
           <div className="max-w-md w-full px-6 py-8">
             <div className="text-center mb-8">
@@ -86,13 +85,15 @@ const Index = () => {
                 Vizioway
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
-                Entrez votre nom pour accéder à la plateforme
+                Connectez-vous pour accéder à la plateforme
               </p>
             </div>
-            <LoginForm />
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+              <SignIn />
+            </div>
           </div>
         </div>
-      )}
+      </SignedOut>
     </div>
   );
 };
