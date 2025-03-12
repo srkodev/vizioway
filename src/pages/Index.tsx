@@ -38,41 +38,23 @@ const Index = () => {
         <Header appName="Vizioway" />
         <main className="pt-24 container mx-auto px-4 pb-12">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-6">
+            <h1 className="text-4xl font-bold text-gray-900 mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
               Bienvenue sur Vizioway
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-xl text-gray-600 mb-8" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
               Votre plateforme de visioconférence sécurisée et simple d'utilisation
             </p>
             
-            <form onSubmit={handleJoinMeeting} className="mb-12">
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-2xl mx-auto">
-                <Input
-                  type="text"
-                  placeholder="Entrez un code de réunion"
-                  className="w-full"
-                  value={meetingCode}
-                  onChange={(e) => setMeetingCode(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  className="w-full sm:w-auto"
-                >
-                  Rejoindre
-                </Button>
-              </div>
-            </form>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
               <div className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
-                <h2 className="text-2xl font-semibold mb-6">Démarrer une réunion</h2>
+                <h2 className="text-2xl font-semibold mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>Démarrer une réunion</h2>
                 <div className="mb-6">
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-gray-600 mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
                     Créez une nouvelle réunion et invitez vos collaborateurs à vous rejoindre.
                   </p>
                   <Button 
                     onClick={() => navigate("/new-meeting")}
-                    className="w-full"
+                    className="w-full bg-blue-600 hover:bg-blue-700"
                     size="lg"
                   >
                     Nouvelle réunion
@@ -81,9 +63,9 @@ const Index = () => {
               </div>
               
               <div className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
-                <h2 className="text-2xl font-semibold mb-6">Rejoindre une réunion</h2>
+                <h2 className="text-2xl font-semibold mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>Rejoindre une réunion</h2>
                 <div className="mb-6">
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-gray-600 mb-6" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
                     Rejoignez une réunion existante en utilisant le code fourni par l'organisateur.
                   </p>
                   <div className="space-y-3">
@@ -95,7 +77,7 @@ const Index = () => {
                     />
                     <Button
                       onClick={handleJoinMeeting}
-                      className="w-full"
+                      className="w-full bg-blue-600 hover:bg-blue-700"
                       size="lg"
                       disabled={!meetingCode.trim()}
                     >
@@ -107,7 +89,7 @@ const Index = () => {
             </div>
             
             <div className="mb-16">
-              <h2 className="text-3xl font-bold mb-8">Nos fonctionnalités</h2>
+              <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: 'Comfortaa, sans-serif' }}>Nos fonctionnalités</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                 <FeatureCard 
                   icon={<Video className="h-8 w-8" />}
@@ -143,10 +125,10 @@ const Index = () => {
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="max-w-md w-full px-6 py-8">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+              <h1 className="text-3xl font-bold text-blue-600 mb-4" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
                 Vizioway
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
                 Connexion à votre compte pour accéder à la plateforme
               </p>
             </div>
@@ -167,8 +149,8 @@ interface FeatureCardProps {
 const FeatureCard = ({ icon, title, description }: FeatureCardProps) => (
   <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col items-center text-center">
     <div className="mb-4 text-blue-600">{icon}</div>
-    <h3 className="font-semibold mb-2">{title}</h3>
-    <p className="text-sm text-gray-600">{description}</p>
+    <h3 className="font-semibold mb-2" style={{ fontFamily: 'Comfortaa, sans-serif' }}>{title}</h3>
+    <p className="text-sm text-gray-600" style={{ fontFamily: 'Comfortaa, sans-serif' }}>{description}</p>
   </div>
 );
 

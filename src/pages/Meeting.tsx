@@ -12,19 +12,14 @@ import Participants from "@/components/Participants";
 import { 
   useHMSActions, 
   useHMSStore, 
-  selectPeers, 
+  selectPeers,
   selectIsConnectedToRoom,
-  HMSRoomProvider,
+  selectLocalPeer,
+  selectIsLocalAudioEnabled,
+  selectIsLocalVideoEnabled,
+  HMSRoomProvider
 } from "@100mslive/react-sdk";
-
-// Type for simulated participants
-interface SimulatedParticipant {
-  id: string;
-  name: string;
-  isLocal: boolean;
-  audioEnabled: boolean;
-  videoEnabled: boolean;
-}
+import { apiClient } from "@/utils/api";
 
 const MeetingContent = () => {
   const { id: roomId } = useParams();
@@ -32,98 +27,74 @@ const MeetingContent = () => {
   const { user } = useUser();
   const hmsActions = useHMSActions();
   const isConnected = useHMSStore(selectIsConnectedToRoom);
+  const peers = useHMSStore(selectPeers);
+  const localPeer = useHMSStore(selectLocalPeer);
+  const isAudioEnabled = useHMSStore(selectIsLocalAudioEnabled);
+  const isVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [simulatedPeers, setSimulatedPeers] = useState<SimulatedParticipant[]>([]);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [simulatedMessages, setSimulatedMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !user) return;
     
-    const simulateConference = () => {
+    const joinRoom = async () => {
       try {
         setIsLoading(true);
-        console.log("Simulation de connexion à la conférence");
         
-        // Simuler les participants
-        const localUser = {
-          id: 'local-user-id',
-          name: user?.firstName || 'Vous',
-          isLocal: true,
-          audioEnabled: isAudioEnabled,
-          videoEnabled: isVideoEnabled
-        };
+        // In a real implementation, we would fetch a token from our backend
+        // For now, we'll use a direct connection
+        const userName = user.firstName || 'Utilisateur';
         
-        const otherParticipants = [
-          {
-            id: 'participant-1',
-            name: 'Jean Martin',
-            isLocal: false,
-            audioEnabled: true,
-            videoEnabled: true
-          },
-          {
-            id: 'participant-2',
-            name: 'Sophie Dupont',
-            isLocal: false,
-            audioEnabled: false,
-            videoEnabled: true
-          },
-          {
-            id: 'participant-3',
-            name: 'Marc Leroy',
-            isLocal: false,
-            audioEnabled: true,
-            videoEnabled: false
-          }
-        ];
-        
-        setSimulatedPeers([localUser, ...otherParticipants]);
-        
-        // Simuler quelques messages pour le chat
-        setSimulatedMessages([
-          {
-            id: 'msg-1',
-            senderName: 'Jean Martin',
-            sender: 'participant-1',
-            senderUserId: 'participant-1',
-            message: 'Bonjour tout le monde !',
-            time: new Date().getTime() - 15000
-          },
-          {
-            id: 'msg-2',
-            senderName: 'Sophie Dupont',
-            sender: 'participant-2',
-            senderUserId: 'participant-2',
-            message: 'Comment allez-vous aujourd\'hui ?',
-            time: new Date().getTime() - 10000
-          }
-        ]);
+        // Initialize the 100ms SDK and join the room
+        await hmsActions.join({
+          userName,
+          roomCode: roomId // Using room code for simplicity
+        });
         
         toast.success("Vous avez rejoint la réunion");
       } catch (error) {
-        console.error("Error in simulation:", error);
+        console.error("Error joining room:", error);
         toast.error("Impossible de rejoindre la réunion");
       } finally {
         setIsLoading(false);
       }
     };
     
-    simulateConference();
+    if (!isConnected) {
+      joinRoom();
+    }
     
     return () => {
-      console.log("Déconnexion de la salle de réunion");
-      
-      // Réinitialiser l'état
-      setSimulatedPeers([]);
-      setSimulatedMessages([]);
+      if (isConnected) {
+        hmsActions.leave();
+      }
     };
-  }, [roomId, navigate, user]);
+  }, [roomId, user, hmsActions, isConnected, navigate]);
+
+  // Setup message listener
+  useEffect(() => {
+    const onMessage = (data: any) => {
+      const newMessage = {
+        id: `msg-${Date.now()}`,
+        senderName: data.senderName,
+        sender: data.senderId,
+        message: data.message,
+        time: Date.now()
+      };
+      
+      setMessages(prev => [...prev, newMessage]);
+    };
+    
+    hmsActions.onMessage(onMessage);
+    
+    return () => {
+      hmsActions.offMessage(onMessage);
+    };
+  }, [hmsActions]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -135,59 +106,63 @@ const MeetingContent = () => {
     if (isChatOpen) setIsChatOpen(false);
   };
 
-  const handleAudioToggle = () => {
-    setIsAudioEnabled(!isAudioEnabled);
-    
-    // Mettre à jour l'état audio du participant local simulé
-    setSimulatedPeers(prev => 
-      prev.map(peer => 
-        peer.isLocal 
-          ? { ...peer, audioEnabled: !isAudioEnabled } 
-          : peer
-      )
-    );
+  const handleAudioToggle = async () => {
+    try {
+      await hmsActions.setLocalAudioEnabled(!isAudioEnabled);
+    } catch (error) {
+      console.error("Error toggling audio:", error);
+      toast.error("Impossible de modifier l'état du microphone");
+    }
   };
 
-  const handleVideoToggle = () => {
-    setIsVideoEnabled(!isVideoEnabled);
-    
-    // Mettre à jour l'état vidéo du participant local simulé
-    setSimulatedPeers(prev => 
-      prev.map(peer => 
-        peer.isLocal 
-          ? { ...peer, videoEnabled: !isVideoEnabled } 
-          : peer
-      )
-    );
+  const handleVideoToggle = async () => {
+    try {
+      await hmsActions.setLocalVideoEnabled(!isVideoEnabled);
+    } catch (error) {
+      console.error("Error toggling video:", error);
+      toast.error("Impossible de modifier l'état de la caméra");
+    }
   };
 
-  const handleScreenShareToggle = () => {
-    setIsScreenSharing(!isScreenSharing);
-    toast.info(isScreenSharing ? "Partage d'écran arrêté" : "Partage d'écran démarré");
+  const handleScreenShareToggle = async () => {
+    try {
+      if (isScreenSharing) {
+        await hmsActions.stopScreenShare();
+      } else {
+        await hmsActions.startScreenShare();
+      }
+      setIsScreenSharing(!isScreenSharing);
+      toast.info(isScreenSharing ? "Partage d'écran arrêté" : "Partage d'écran démarré");
+    } catch (error) {
+      console.error("Error toggling screen share:", error);
+      toast.error("Impossible de partager l'écran");
+    }
   };
 
-  const handleSendMessage = (message: string) => {
+  const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
     
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      senderName: user?.firstName || 'Vous',
-      sender: 'local-user-id',
-      senderUserId: 'local-user-id',
-      message: message,
-      time: new Date().getTime()
-    };
-    
-    setSimulatedMessages(prev => [...prev, newMessage]);
+    try {
+      await hmsActions.sendBroadcastMessage(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Impossible d'envoyer le message");
+    }
   };
 
-  const handleLeaveRoom = () => {
-    navigate("/");
-    toast.info("Vous avez quitté la réunion");
+  const handleLeaveRoom = async () => {
+    try {
+      await hmsActions.leave();
+      navigate("/");
+      toast.info("Vous avez quitté la réunion");
+    } catch (error) {
+      console.error("Error leaving room:", error);
+      toast.error("Impossible de quitter la réunion");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
       <Header appName="Vizioway" />
       <main className="pt-16 flex-1 flex">
         <div className="flex-1 flex flex-col p-4">
@@ -199,19 +174,18 @@ const MeetingContent = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                  {simulatedPeers.length === 0 ? (
+                  {peers.length === 0 ? (
                     <div className="col-span-full h-full flex items-center justify-center">
                       <p className="text-gray-500">Aucun participant pour le moment</p>
                     </div>
                   ) : (
-                    simulatedPeers.map(peer => (
+                    peers.map(peer => (
                       <div key={peer.id} className="aspect-video">
                         <VideoTile
                           peerId={peer.id}
                           peerName={peer.name}
                           isLocal={peer.isLocal}
-                          isAudioEnabled={peer.audioEnabled}
-                          simulationMode={true}
+                          isAudioEnabled={peer.audioTrack?.enabled || false}
                         />
                       </div>
                     ))
@@ -225,14 +199,14 @@ const MeetingContent = () => {
                 {isChatOpen && (
                   <Chat 
                     onClose={toggleChat} 
-                    simulatedMessages={simulatedMessages}
                     onSendMessage={handleSendMessage}
+                    messages={messages}
                   />
                 )}
                 {isParticipantsOpen && (
                   <Participants 
-                    onClose={toggleParticipants} 
-                    simulatedPeers={simulatedPeers}
+                    onClose={toggleParticipants}
+                    peers={peers}
                   />
                 )}
               </div>

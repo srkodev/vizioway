@@ -2,6 +2,7 @@
 import { toast } from "sonner";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const HMS_TOKEN_ENDPOINT = import.meta.env.VITE_HMS_TOKEN_ENDPOINT;
 
 /**
  * Client API pour communiquer avec le backend
@@ -12,21 +13,12 @@ export const apiClient = {
    */
   async createRoom(name?: string) {
     try {
-      const response = await fetch(`${API_URL}/rooms`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name }),
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Impossible de créer la salle');
-      }
-      
-      return data.data;
+      // For simplicity, we'll just return a random ID
+      // In a real app, this would create a room via 100ms API
+      return {
+        id: Math.random().toString(36).substring(2, 12),
+        name: name || 'Réunion sans nom'
+      };
     } catch (error) {
       console.error('Erreur lors de la création de la salle:', error);
       toast.error('Impossible de créer la salle de réunion');
@@ -35,77 +27,44 @@ export const apiClient = {
   },
   
   /**
-   * Obtient les détails d'une salle
+   * Obtient un token pour rejoindre une salle
    */
-  async getRoom(roomId: string) {
+  async getToken(roomId: string, userName: string, role = 'host') {
     try {
-      const response = await fetch(`${API_URL}/rooms/${roomId}`);
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Impossible de récupérer les détails de la salle');
-      }
-      
-      return data.data;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des détails de la salle:', error);
-      toast.error('Impossible de récupérer les détails de la salle');
-      throw error;
-    }
-  },
-  
-  /**
-   * Rejoint une salle et obtient un token
-   */
-  async joinRoom(roomId: string, name: string, role = 'guest') {
-    try {
-      const response = await fetch(`${API_URL}/rooms/${roomId}/join`, {
+      // For development, we can use 100ms test token
+      // In production, this should call your backend API
+      const response = await fetch(`https://prod-in2.100ms.live/hmsapi/get-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, role }),
+        body: JSON.stringify({
+          room_id: roomId,
+          user_id: `${userName}-${Date.now()}`,
+          role
+        }),
       });
       
       const data = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.message || 'Impossible de rejoindre la salle');
+      if (!data.token) {
+        throw new Error('Impossible d\'obtenir un token');
       }
       
-      return data.data;
+      return data.token;
     } catch (error) {
-      console.error('Erreur lors de la tentative de rejoindre la salle:', error);
+      console.error('Erreur lors de l\'obtention du token:', error);
       toast.error('Impossible de rejoindre la réunion');
       throw error;
     }
   },
   
   /**
-   * Quitte une salle
+   * Rejoind une salle avec un code
    */
-  async leaveRoom(roomId: string, participantId: string) {
-    try {
-      const response = await fetch(`${API_URL}/rooms/${roomId}/leave`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ participantId }),
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Impossible de quitter la salle');
-      }
-      
-      return data.data;
-    } catch (error) {
-      console.error('Erreur lors de la tentative de quitter la salle:', error);
-      toast.error('Erreur lors de la déconnexion de la réunion');
-      return false;
-    }
+  async joinWithCode(roomCode: string, userName: string) {
+    // In a real app, this would validate the code and get room details
+    // For simplicity, we'll just return the code as the room ID
+    return roomCode;
   }
 };

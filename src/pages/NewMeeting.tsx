@@ -7,7 +7,6 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/utils/api";
-import { v4 as uuidv4 } from 'uuid';
 
 const NewMeeting = () => {
   const navigate = useNavigate();
@@ -17,15 +16,13 @@ const NewMeeting = () => {
   const createMeeting = async () => {
     try {
       setIsCreating(true);
-      // Pour la démo, nous générons simplement un ID de réunion aléatoire
-      // en utilisant UUID pour garantir l'unicité
-      const roomId = uuidv4();
       
-      // Dans une version réelle, nous appellerions l'API
-      // const roomData = await apiClient.createRoom({ name: meetingName });
+      // In a production app, we would create a room with 100ms API
+      // For simplicity, we're using a random roomId
+      const randomRoomId = Math.random().toString(36).substring(2, 12);
       
       toast.success("Réunion créée avec succès");
-      navigate(`/meeting/${roomId}`);
+      navigate(`/meeting/${randomRoomId}`);
     } catch (error) {
       console.error("Erreur lors de la création de la réunion:", error);
       toast.error("Impossible de créer la réunion pour le moment.");
@@ -35,7 +32,7 @@ const NewMeeting = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
       <SignedIn>
         <Header appName="Vizioway" />
         <main className="pt-24 container mx-auto px-4">
@@ -60,7 +57,7 @@ const NewMeeting = () => {
               
               <Button
                 onClick={createMeeting}
-                className="w-full"
+                className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={isCreating}
               >
                 {isCreating ? "Création en cours..." : "Créer une réunion instantanée"}
