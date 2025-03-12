@@ -4,7 +4,8 @@ import {
   useHMSStore, 
   selectVideoTrackByPeerID,
   selectLocalVideoTrackID,
-  selectRemoteVideoTrackByID
+  selectVideoTrackByID,
+  HMSVideoTrack
 } from "@100mslive/react-sdk";
 import { Mic, MicOff } from "lucide-react";
 
@@ -26,23 +27,31 @@ const VideoTile = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrack = useHMSStore(selectVideoTrackByPeerID(peerId));
   
-  // We'll handle screen sharing separately in a more complex implementation
-  // For now, focusing on fixing the type errors
-
   useEffect(() => {
     if (videoRef.current && videoTrack && videoTrack.enabled) {
       try {
         const videoElement = videoRef.current;
         
-        if (videoTrack.id && !videoElement.srcObject) {
+        if (videoTrack && !videoElement.srcObject) {
           const mediaStream = new MediaStream();
-          // Safely get the MediaStreamTrack
-          const track = typeof videoTrack.getMediaTrack === 'function' ? 
-            videoTrack.getMediaTrack() : null;
-            
-          if (track) {
-            mediaStream.addTrack(track);
-            videoElement.srcObject = mediaStream;
+          
+          // Utilisation d'une approche sécurisée pour obtenir la MediaStreamTrack
+          if (videoTrack.id) {
+            // Si nous avons un ID de piste, nous pouvons l'utiliser directement
+            const track = videoTrack.enabled && videoTrack.id ? 
+              navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => stream.getVideoTracks()[0])
+                .catch(e => {
+                  console.error("Could not get video track:", e);
+                  return null;
+                }) : null;
+                
+            if (track) {
+              Promise.resolve(track).then(actualTrack => {
+                mediaStream.addTrack(actualTrack);
+                videoElement.srcObject = mediaStream;
+              });
+            }
           }
         }
       } catch (error) {

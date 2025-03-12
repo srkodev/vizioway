@@ -17,11 +17,13 @@ const Participants = ({ onClose }: ParticipantsProps) => {
   const dominantSpeaker = useHMSStore(selectDominantSpeaker);
 
   const getAudioStatus = (peer: HMSPeer) => {
-    return peer.audioTrack ? peer.audioTrack.enabled : false;
+    if (!peer.audioTrack) return false;
+    return typeof peer.audioTrack === 'string' ? false : peer.audioTrack.enabled;
   };
 
   const getVideoStatus = (peer: HMSPeer) => {
-    return peer.videoTrack ? peer.videoTrack.enabled : false;
+    if (!peer.videoTrack) return false;
+    return typeof peer.videoTrack === 'string' ? false : peer.videoTrack.enabled;
   };
 
   return (
