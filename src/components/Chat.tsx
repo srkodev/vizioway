@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,18 +10,38 @@ import {
 
 interface ChatProps {
   onClose: () => void;
+  simulatedMessages?: Array<{
+    id: string;
+    senderName: string;
+    sender: string;
+    senderUserId: string;
+    message: string;
+    time: number;
+  }>;
+  onSendMessage?: (message: string) => void;
 }
 
-const Chat = ({ onClose }: ChatProps) => {
+const Chat = ({ onClose, simulatedMessages = [], onSendMessage }: ChatProps) => {
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hmsActions = useHMSActions();
-  const messages = useHMSStore(selectHMSMessages);
+  const hmsMessages = useHMSStore(selectHMSMessages);
+  
+  // Use simulated messages if provided, otherwise use HMS messages
+  const messages = simulatedMessages.length > 0 ? simulatedMessages : hmsMessages;
   
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (message.trim()) {
-      hmsActions.sendBroadcastMessage(message.trim());
+      if (onSendMessage) {
+        // Use the simulated message sender
+        onSendMessage(message.trim());
+      } else {
+        // Use the HMS SDK to send a real message
+        hmsActions.sendBroadcastMessage(message.trim());
+      }
+      
       setMessage("");
     }
   };

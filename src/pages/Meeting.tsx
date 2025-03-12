@@ -9,21 +9,21 @@ import MeetingControls from "@/components/MeetingControls";
 import VideoTile from "@/components/VideoTile";
 import Chat from "@/components/Chat";
 import Participants from "@/components/Participants";
-import { apiClient } from "@/utils/api";
 import { 
   useHMSActions, 
   useHMSStore, 
   selectPeers, 
   selectIsConnectedToRoom,
   HMSRoomProvider,
-  HMSPeer
 } from "@100mslive/react-sdk";
 
-// Type de sécurité pour le participant local
-interface LocalParticipant {
+// Type for simulated participants
+interface SimulatedParticipant {
   id: string;
-  roomId: string;
-  token: string;
+  name: string;
+  isLocal: boolean;
+  audioEnabled: boolean;
+  videoEnabled: boolean;
 }
 
 const MeetingContent = () => {
@@ -32,83 +32,98 @@ const MeetingContent = () => {
   const { user } = useUser();
   const hmsActions = useHMSActions();
   const isConnected = useHMSStore(selectIsConnectedToRoom);
-  const peers = useHMSStore(selectPeers);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
-  const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [simulatedPeers, setSimulatedPeers] = useState<SimulatedParticipant[]>([]);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [simulatedMessages, setSimulatedMessages] = useState<any[]>([]);
 
   useEffect(() => {
     if (!roomId) return;
     
-    const joinRoom = async () => {
+    const simulateConference = () => {
       try {
         setIsLoading(true);
+        console.log("Simulation de connexion à la conférence");
         
-        // Obtenir un token depuis notre backend
-        const joinResponse = await apiClient.joinRoom(
-          roomId, 
-          user?.firstName || 'Invité'
-        );
+        // Simuler les participants
+        const localUser = {
+          id: 'local-user-id',
+          name: user?.firstName || 'Vous',
+          isLocal: true,
+          audioEnabled: isAudioEnabled,
+          videoEnabled: isVideoEnabled
+        };
         
-        // Stocker les infos du participant local
-        setLocalParticipant({
-          id: joinResponse.participantId,
-          roomId,
-          token: joinResponse.token
-        });
-        
-        // Connecter à 100ms avec le token fourni par notre backend
-        await hmsActions.join({
-          userName: user?.firstName || 'Invité',
-          authToken: joinResponse.token,
-          settings: {
-            isAudioMuted: true,
-            isVideoMuted: false,
+        const otherParticipants = [
+          {
+            id: 'participant-1',
+            name: 'Jean Martin',
+            isLocal: false,
+            audioEnabled: true,
+            videoEnabled: true
+          },
+          {
+            id: 'participant-2',
+            name: 'Sophie Dupont',
+            isLocal: false,
+            audioEnabled: false,
+            videoEnabled: true
+          },
+          {
+            id: 'participant-3',
+            name: 'Marc Leroy',
+            isLocal: false,
+            audioEnabled: true,
+            videoEnabled: false
           }
-        });
+        ];
+        
+        setSimulatedPeers([localUser, ...otherParticipants]);
+        
+        // Simuler quelques messages pour le chat
+        setSimulatedMessages([
+          {
+            id: 'msg-1',
+            senderName: 'Jean Martin',
+            sender: 'participant-1',
+            senderUserId: 'participant-1',
+            message: 'Bonjour tout le monde !',
+            time: new Date().getTime() - 15000
+          },
+          {
+            id: 'msg-2',
+            senderName: 'Sophie Dupont',
+            sender: 'participant-2',
+            senderUserId: 'participant-2',
+            message: 'Comment allez-vous aujourd\'hui ?',
+            time: new Date().getTime() - 10000
+          }
+        ]);
         
         toast.success("Vous avez rejoint la réunion");
       } catch (error) {
-        console.error("Error joining room:", error);
+        console.error("Error in simulation:", error);
         toast.error("Impossible de rejoindre la réunion");
-        
-        // En mode développement, nous simulons une connexion
-        if (process.env.NODE_ENV === 'development') {
-          console.log("Simulation d'une connexion à la salle de réunion");
-          setLocalParticipant({
-            id: 'local-user-id',
-            roomId: roomId || '',
-            token: 'simulated-token'
-          });
-        }
       } finally {
         setIsLoading(false);
       }
     };
     
-    joinRoom();
+    simulateConference();
     
     return () => {
-      // Déconnexion lorsque le composant est démonté
-      const leaveRoom = async () => {
-        if (isConnected) {
-          await hmsActions.leave();
-        }
-        
-        // Informer le backend que nous quittons la salle
-        if (localParticipant) {
-          await apiClient.leaveRoom(
-            localParticipant.roomId,
-            localParticipant.id
-          );
-        }
-      };
+      console.log("Déconnexion de la salle de réunion");
       
-      leaveRoom();
+      // Réinitialiser l'état
+      setSimulatedPeers([]);
+      setSimulatedMessages([]);
     };
-  }, [roomId, hmsActions, navigate, user, isConnected]);
+  }, [roomId, navigate, user]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -120,19 +135,60 @@ const MeetingContent = () => {
     if (isChatOpen) setIsChatOpen(false);
   };
 
-  const getVideoEnabled = (peer: HMSPeer) => {
-    if (!peer.videoTrack) return false;
-    return typeof peer.videoTrack === 'string' ? false : peer.videoTrack.enabled;
+  const handleAudioToggle = () => {
+    setIsAudioEnabled(!isAudioEnabled);
+    
+    // Mettre à jour l'état audio du participant local simulé
+    setSimulatedPeers(prev => 
+      prev.map(peer => 
+        peer.isLocal 
+          ? { ...peer, audioEnabled: !isAudioEnabled } 
+          : peer
+      )
+    );
   };
 
-  const getAudioEnabled = (peer: HMSPeer) => {
-    if (!peer.audioTrack) return false;
-    return typeof peer.audioTrack === 'string' ? false : peer.audioTrack.enabled;
+  const handleVideoToggle = () => {
+    setIsVideoEnabled(!isVideoEnabled);
+    
+    // Mettre à jour l'état vidéo du participant local simulé
+    setSimulatedPeers(prev => 
+      prev.map(peer => 
+        peer.isLocal 
+          ? { ...peer, videoEnabled: !isVideoEnabled } 
+          : peer
+      )
+    );
+  };
+
+  const handleScreenShareToggle = () => {
+    setIsScreenSharing(!isScreenSharing);
+    toast.info(isScreenSharing ? "Partage d'écran arrêté" : "Partage d'écran démarré");
+  };
+
+  const handleSendMessage = (message: string) => {
+    if (!message.trim()) return;
+    
+    const newMessage = {
+      id: `msg-${Date.now()}`,
+      senderName: user?.firstName || 'Vous',
+      sender: 'local-user-id',
+      senderUserId: 'local-user-id',
+      message: message,
+      time: new Date().getTime()
+    };
+    
+    setSimulatedMessages(prev => [...prev, newMessage]);
+  };
+
+  const handleLeaveRoom = () => {
+    navigate("/");
+    toast.info("Vous avez quitté la réunion");
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+      <Header appName="Vizioway" />
       <main className="pt-16 flex-1 flex">
         <div className="flex-1 flex flex-col p-4">
           <div className="flex-1 flex flex-col lg:flex-row gap-4">
@@ -141,27 +197,21 @@ const MeetingContent = () => {
                 <div className="h-full flex items-center justify-center">
                   <p className="text-gray-500">Connexion à la réunion...</p>
                 </div>
-              ) : !isConnected ? (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-gray-500">
-                    Connexion à la réunion...
-                    {process.env.NODE_ENV === 'development' && ' (Mode simulation)'}
-                  </p>
-                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                  {peers.length === 0 ? (
+                  {simulatedPeers.length === 0 ? (
                     <div className="col-span-full h-full flex items-center justify-center">
                       <p className="text-gray-500">Aucun participant pour le moment</p>
                     </div>
                   ) : (
-                    peers.map(peer => (
+                    simulatedPeers.map(peer => (
                       <div key={peer.id} className="aspect-video">
                         <VideoTile
                           peerId={peer.id}
                           peerName={peer.name}
                           isLocal={peer.isLocal}
-                          isAudioEnabled={getAudioEnabled(peer)}
+                          isAudioEnabled={peer.audioEnabled}
+                          simulationMode={true}
                         />
                       </div>
                     ))
@@ -172,8 +222,19 @@ const MeetingContent = () => {
             
             {(isChatOpen || isParticipantsOpen) && (
               <div className="w-full lg:w-80 h-80 lg:h-auto">
-                {isChatOpen && <Chat onClose={toggleChat} />}
-                {isParticipantsOpen && <Participants onClose={toggleParticipants} />}
+                {isChatOpen && (
+                  <Chat 
+                    onClose={toggleChat} 
+                    simulatedMessages={simulatedMessages}
+                    onSendMessage={handleSendMessage}
+                  />
+                )}
+                {isParticipantsOpen && (
+                  <Participants 
+                    onClose={toggleParticipants} 
+                    simulatedPeers={simulatedPeers}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -182,6 +243,13 @@ const MeetingContent = () => {
             <MeetingControls 
               onChatToggle={toggleChat}
               onParticipantsToggle={toggleParticipants}
+              onAudioToggle={handleAudioToggle}
+              onVideoToggle={handleVideoToggle}
+              onScreenShareToggle={handleScreenShareToggle}
+              onLeaveRoom={handleLeaveRoom}
+              isAudioEnabled={isAudioEnabled}
+              isVideoEnabled={isVideoEnabled}
+              isScreenShared={isScreenSharing}
             />
           </div>
         </div>

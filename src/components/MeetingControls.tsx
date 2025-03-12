@@ -1,57 +1,37 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { 
   Mic, MicOff, Video, VideoOff, 
   ScreenShare, Share2, MessageCircle, Users, PhoneOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  useHMSActions, 
-  useHMSStore, 
-  selectIsLocalAudioEnabled,
-  selectIsLocalVideoEnabled,
-  selectIsLocalScreenShared
-} from "@100mslive/react-sdk";
 
 interface MeetingControlsProps {
   onChatToggle: () => void;
   onParticipantsToggle: () => void;
+  onAudioToggle: () => void;
+  onVideoToggle: () => void;
+  onScreenShareToggle: () => void;
+  onLeaveRoom: () => void;
+  isAudioEnabled: boolean;
+  isVideoEnabled: boolean;
+  isScreenShared: boolean;
 }
 
-const MeetingControls = ({ onChatToggle, onParticipantsToggle }: MeetingControlsProps) => {
-  const navigate = useNavigate();
-  const hmsActions = useHMSActions();
-  
-  const isAudioEnabled = useHMSStore(selectIsLocalAudioEnabled);
-  const isVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
-  const isScreenShared = useHMSStore(selectIsLocalScreenShared);
-
-  const toggleAudio = async () => {
-    await hmsActions.setLocalAudioEnabled(!isAudioEnabled);
-  };
-
-  const toggleVideo = async () => {
-    await hmsActions.setLocalVideoEnabled(!isVideoEnabled);
-  };
-
-  const toggleScreenShare = async () => {
-    await hmsActions.setScreenShareEnabled(!isScreenShared);
-  };
-
-  const leaveRoom = async () => {
-    try {
-      await hmsActions.leave();
-      navigate("/");
-    } catch (error) {
-      console.error("Error leaving room:", error);
-    }
-  };
-
+const MeetingControls = ({ 
+  onChatToggle, 
+  onParticipantsToggle,
+  onAudioToggle,
+  onVideoToggle,
+  onScreenShareToggle,
+  onLeaveRoom,
+  isAudioEnabled,
+  isVideoEnabled,
+  isScreenShared
+}: MeetingControlsProps) => {
   return (
     <div className="flex flex-wrap items-center justify-center space-x-2 md:space-x-4">
       <Button 
-        onClick={toggleAudio} 
+        onClick={onAudioToggle} 
         variant="outline" 
         size="icon" 
         className={`rounded-full p-3 ${!isAudioEnabled ? 'bg-red-100' : ''}`}
@@ -60,7 +40,7 @@ const MeetingControls = ({ onChatToggle, onParticipantsToggle }: MeetingControls
       </Button>
       
       <Button 
-        onClick={toggleVideo} 
+        onClick={onVideoToggle} 
         variant="outline" 
         size="icon" 
         className={`rounded-full p-3 ${!isVideoEnabled ? 'bg-red-100' : ''}`}
@@ -69,7 +49,7 @@ const MeetingControls = ({ onChatToggle, onParticipantsToggle }: MeetingControls
       </Button>
       
       <Button 
-        onClick={toggleScreenShare} 
+        onClick={onScreenShareToggle} 
         variant="outline" 
         size="icon" 
         className={`rounded-full p-3 ${isScreenShared ? 'bg-blue-100' : ''}`}
@@ -96,7 +76,7 @@ const MeetingControls = ({ onChatToggle, onParticipantsToggle }: MeetingControls
       </Button>
       
       <Button 
-        onClick={leaveRoom} 
+        onClick={onLeaveRoom} 
         variant="destructive" 
         size="icon" 
         className="rounded-full p-3"
