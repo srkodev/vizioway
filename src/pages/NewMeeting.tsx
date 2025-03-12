@@ -5,7 +5,6 @@ import { SignedIn } from "@clerk/clerk-react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { selectHMSRole } from "@100mslive/react-sdk";
 
 const NewMeeting = () => {
   const navigate = useNavigate();
