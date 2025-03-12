@@ -19,7 +19,6 @@ import {
   selectIsLocalVideoEnabled,
   HMSRoomProvider
 } from "@100mslive/react-sdk";
-import { apiClient } from "@/utils/api";
 
 const MeetingContent = () => {
   const { id: roomId } = useParams();
@@ -36,7 +35,6 @@ const MeetingContent = () => {
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
     if (!roomId || !user) return;
@@ -46,13 +44,12 @@ const MeetingContent = () => {
         setIsLoading(true);
         
         // In a real implementation, we would fetch a token from our backend
-        // For now, we'll use a direct connection
         const userName = user.firstName || 'Utilisateur';
         
         // Initialize the 100ms SDK and join the room
         await hmsActions.join({
           userName,
-          roomCode: roomId // Using room code for simplicity
+          authToken: roomId // Using room ID as auth token for simplicity
         });
         
         toast.success("Vous avez rejoint la réunion");
@@ -74,27 +71,6 @@ const MeetingContent = () => {
       }
     };
   }, [roomId, user, hmsActions, isConnected, navigate]);
-
-  // Setup message listener
-  useEffect(() => {
-    const onMessage = (data: any) => {
-      const newMessage = {
-        id: `msg-${Date.now()}`,
-        senderName: data.senderName,
-        sender: data.senderId,
-        message: data.message,
-        time: Date.now()
-      };
-      
-      setMessages(prev => [...prev, newMessage]);
-    };
-    
-    hmsActions.onMessage(onMessage);
-    
-    return () => {
-      hmsActions.offMessage(onMessage);
-    };
-  }, [hmsActions]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -127,9 +103,9 @@ const MeetingContent = () => {
   const handleScreenShareToggle = async () => {
     try {
       if (isScreenSharing) {
-        await hmsActions.stopScreenShare();
+        await hmsActions.setScreenShareEnabled(false);
       } else {
-        await hmsActions.startScreenShare();
+        await hmsActions.setScreenShareEnabled(true);
       }
       setIsScreenSharing(!isScreenSharing);
       toast.info(isScreenSharing ? "Partage d'écran arrêté" : "Partage d'écran démarré");
@@ -162,21 +138,21 @@ const MeetingContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <Header appName="Vizioway" />
       <main className="pt-16 flex-1 flex">
         <div className="flex-1 flex flex-col p-4">
           <div className="flex-1 flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 bg-white rounded-lg shadow p-4 h-full">
+            <div className="flex-1 bg-white dark:bg-gray-900 rounded-lg shadow p-4 h-full">
               {isLoading ? (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-gray-500">Connexion à la réunion...</p>
+                  <p className="text-gray-500 dark:text-gray-400">Connexion à la réunion...</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
                   {peers.length === 0 ? (
                     <div className="col-span-full h-full flex items-center justify-center">
-                      <p className="text-gray-500">Aucun participant pour le moment</p>
+                      <p className="text-gray-500 dark:text-gray-400">Aucun participant pour le moment</p>
                     </div>
                   ) : (
                     peers.map(peer => (
@@ -185,7 +161,7 @@ const MeetingContent = () => {
                           peerId={peer.id}
                           peerName={peer.name}
                           isLocal={peer.isLocal}
-                          isAudioEnabled={peer.audioTrack?.enabled || false}
+                          isAudioEnabled={peer.audioEnabled}
                         />
                       </div>
                     ))
@@ -200,20 +176,18 @@ const MeetingContent = () => {
                   <Chat 
                     onClose={toggleChat} 
                     onSendMessage={handleSendMessage}
-                    messages={messages}
                   />
                 )}
                 {isParticipantsOpen && (
                   <Participants 
                     onClose={toggleParticipants}
-                    peers={peers}
                   />
                 )}
               </div>
             )}
           </div>
           
-          <div className="bg-white rounded-lg shadow p-4 mt-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 mt-4">
             <MeetingControls 
               onChatToggle={toggleChat}
               onParticipantsToggle={toggleParticipants}

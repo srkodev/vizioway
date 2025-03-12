@@ -27,8 +27,10 @@ const VideoTile = ({
     if (videoTrack?.enabled && videoRef.current) {
       if (videoTrack.enabled) {
         try {
-          videoTrack.attach(videoRef.current);
-          setVideoEnabled(true);
+          if (typeof videoTrack.attachTo === 'function') {
+            videoTrack.attachTo(videoRef.current);
+            setVideoEnabled(true);
+          }
         } catch (err) {
           console.error("Error attaching video:", err);
           setVideoEnabled(false);
@@ -40,7 +42,9 @@ const VideoTile = ({
       return () => {
         if (videoTrack) {
           try {
-            videoTrack.detach(videoRef.current);
+            if (typeof videoTrack.detachFrom === 'function') {
+              videoTrack.detachFrom(videoRef.current);
+            }
           } catch (err) {
             console.error("Error detaching video:", err);
           }
@@ -52,7 +56,7 @@ const VideoTile = ({
   }, [videoTrack]);
 
   return (
-    <div className="relative rounded-lg overflow-hidden bg-gray-800 w-full h-full">
+    <div className="relative rounded-lg overflow-hidden bg-gray-900 w-full h-full">
       <video
         ref={videoRef}
         autoPlay
@@ -62,15 +66,15 @@ const VideoTile = ({
       />
 
       {!videoEnabled && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-800 text-white">
-          <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
+          <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold">
             {peerName.charAt(0).toUpperCase()}
           </div>
         </div>
       )}
 
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-        <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded-md text-sm flex items-center gap-2" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
+        <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded-md text-sm flex items-center gap-2">
           {isLocal ? `${peerName} (Vous)` : peerName}
           {!audioTrack?.enabled && <MicOff className="h-4 w-4" />}
         </div>

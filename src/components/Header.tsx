@@ -8,10 +8,10 @@ interface HeaderProps {
 
 const Header = ({ appName = "Vizioway" }: HeaderProps) => {
   return (
-    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
+    <header className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
-          <span className="text-2xl font-bold text-blue-600">
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400" style={{ fontFamily: 'Comfortaa, sans-serif' }}>
             {appName}
           </span>
         </Link>

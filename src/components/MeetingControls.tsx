@@ -34,7 +34,7 @@ const MeetingControls = ({
         onClick={onAudioToggle} 
         variant="outline" 
         size="icon" 
-        className={`rounded-full p-3 ${!isAudioEnabled ? 'bg-red-100' : ''}`}
+        className={`rounded-full p-3 ${!isAudioEnabled ? 'bg-red-100 dark:bg-red-900/30' : ''}`}
       >
         {isAudioEnabled ? <Mic /> : <MicOff className="text-red-500" />}
       </Button>
@@ -43,7 +43,7 @@ const MeetingControls = ({
         onClick={onVideoToggle} 
         variant="outline" 
         size="icon" 
-        className={`rounded-full p-3 ${!isVideoEnabled ? 'bg-red-100' : ''}`}
+        className={`rounded-full p-3 ${!isVideoEnabled ? 'bg-red-100 dark:bg-red-900/30' : ''}`}
       >
         {isVideoEnabled ? <Video /> : <VideoOff className="text-red-500" />}
       </Button>
@@ -52,7 +52,7 @@ const MeetingControls = ({
         onClick={onScreenShareToggle} 
         variant="outline" 
         size="icon" 
-        className={`rounded-full p-3 ${isScreenShared ? 'bg-blue-100' : ''}`}
+        className={`rounded-full p-3 ${isScreenShared ? 'bg-blue-100 dark:bg-blue-900/30' : ''}`}
       >
         {isScreenShared ? <Share2 className="text-blue-500" /> : <ScreenShare />}
       </Button>
