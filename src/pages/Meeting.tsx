@@ -158,7 +158,7 @@ const Meeting = () => {
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: user.id,
-      senderName: user.name,
+      senderName: user.fullName || user.username || "Utilisateur",
       text: message,
       timestamp: new Date()
     };
