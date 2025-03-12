@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { 
   useHMSStore, 
   selectPeers,
-  selectDominantSpeaker
+  selectDominantSpeaker,
+  HMSPeer
 } from "@100mslive/react-sdk";
 
 interface ParticipantsProps {
@@ -14,6 +15,14 @@ interface ParticipantsProps {
 const Participants = ({ onClose }: ParticipantsProps) => {
   const peers = useHMSStore(selectPeers);
   const dominantSpeaker = useHMSStore(selectDominantSpeaker);
+
+  const getAudioStatus = (peer: HMSPeer) => {
+    return peer.audioTrack ? peer.audioTrack.enabled : false;
+  };
+
+  const getVideoStatus = (peer: HMSPeer) => {
+    return peer.videoTrack ? peer.videoTrack.enabled : false;
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-lg flex flex-col h-full">
@@ -38,9 +47,9 @@ const Participants = ({ onClose }: ParticipantsProps) => {
             <div className="flex-1">
               <p className="font-medium">{peer.name} {peer.isLocal ? ' (Vous)' : ''}</p>
               <p className="text-xs text-gray-500">
-                {peer.audioTrack?.enabled ? 'Micro activé' : 'Micro désactivé'}
+                {getAudioStatus(peer) ? 'Micro activé' : 'Micro désactivé'}
                 {' • '}
-                {peer.videoTrack?.enabled ? 'Caméra activée' : 'Caméra désactivée'}
+                {getVideoStatus(peer) ? 'Caméra activée' : 'Caméra désactivée'}
               </p>
             </div>
             {dominantSpeaker?.id === peer.id && (

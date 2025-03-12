@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
@@ -13,7 +14,8 @@ import {
   useHMSStore, 
   selectPeers, 
   selectIsConnectedToRoom,
-  HMSRoomProvider
+  HMSRoomProvider,
+  HMSPeer
 } from "@100mslive/react-sdk";
 
 const MeetingContent = () => {
@@ -34,7 +36,7 @@ const MeetingContent = () => {
       try {
         await hmsActions.join({
           userName: user?.firstName || 'Invité',
-          authToken: "votre_token_100ms",
+          authToken: "votre_token_100ms", // This should be replaced with a real token from your backend
           settings: {
             isAudioMuted: true,
             isVideoMuted: false,
@@ -68,7 +70,13 @@ const MeetingContent = () => {
     if (isChatOpen) setIsChatOpen(false);
   };
 
-  const localPeer = peers.find(peer => peer.isLocal);
+  const getVideoEnabled = (peer: HMSPeer) => {
+    return peer.videoTrack ? peer.videoTrack.enabled : false;
+  };
+
+  const getAudioEnabled = (peer: HMSPeer) => {
+    return peer.audioTrack ? peer.audioTrack.enabled : false;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -94,7 +102,7 @@ const MeetingContent = () => {
                           peerId={peer.id}
                           peerName={peer.name}
                           isLocal={peer.isLocal}
-                          isAudioEnabled={peer.audioTrack?.enabled}
+                          isAudioEnabled={getAudioEnabled(peer)}
                         />
                       </div>
                     ))
