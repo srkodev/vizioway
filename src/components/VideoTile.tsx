@@ -1,15 +1,9 @@
 
 import { useRef, useEffect, useState } from "react";
-import { 
-  useHMSStore, 
-  selectVideoTrackByPeerID, 
-  selectAudioTrackByPeerID,
-  selectIsPeerAudioEnabled
-} from "@100mslive/react-sdk";
 import { Mic, MicOff } from "lucide-react";
 
 interface VideoTileProps {
-  peerId: string;
+  stream: MediaStream;
   peerName: string;
   isLocal: boolean;
   isAudioEnabled?: boolean;
@@ -17,55 +11,40 @@ interface VideoTileProps {
 }
 
 const VideoTile = ({ 
-  peerId, 
+  stream, 
   peerName, 
   isLocal, 
   isAudioEnabled = true,
   isScreenShare = false
 }: VideoTileProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const videoTrack = useHMSStore(selectVideoTrackByPeerID(peerId));
-  const audioTrack = useHMSStore(selectAudioTrackByPeerID(peerId));
-  const isPeerAudioEnabled = useHMSStore(selectIsPeerAudioEnabled(peerId));
   const [videoEnabled, setVideoEnabled] = useState(false);
   
   useEffect(() => {
-    if (videoTrack?.enabled && videoRef.current) {
+    if (stream && videoRef.current) {
       try {
-        // 100ms SDK specific way to attach video
-        if (videoTrack && videoRef.current) {
-          const attachVideoTrack = async () => {
-            try {
-              // @ts-ignore - we know this method exists in the 100ms SDK
-              await videoTrack.attachTo(videoRef.current);
-              setVideoEnabled(true);
-            } catch (err) {
-              console.error("Error attaching video:", err);
-              setVideoEnabled(false);
-            }
-          };
-          
-          attachVideoTrack();
-        }
+        videoRef.current.srcObject = stream;
+        setVideoEnabled(true);
+        
+        const checkVideo = () => {
+          const videoTracks = stream.getVideoTracks();
+          setVideoEnabled(videoTracks.length > 0 && videoTracks[0].enabled);
+        };
+        
+        // Vérification initiale
+        checkVideo();
+        
+        // Vérification périodique
+        const interval = setInterval(checkVideo, 1000);
+        return () => clearInterval(interval);
       } catch (err) {
-        console.error("Error attaching video:", err);
+        console.error("Error setting video stream:", err);
         setVideoEnabled(false);
       }
-      
-      return () => {
-        if (videoTrack && videoRef.current) {
-          try {
-            // @ts-ignore - we know this method exists in the 100ms SDK
-            videoTrack.detachFrom(videoRef.current);
-          } catch (err) {
-            console.error("Error detaching video:", err);
-          }
-        }
-      };
     } else {
       setVideoEnabled(false);
     }
-  }, [videoTrack]);
+  }, [stream]);
 
   return (
     <div className="relative rounded-lg overflow-hidden bg-gray-900 w-full h-full">
@@ -88,7 +67,7 @@ const VideoTile = ({
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
         <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded-md text-sm flex items-center gap-2">
           {isLocal ? `${peerName} (Vous)` : peerName}
-          {!isPeerAudioEnabled && <MicOff className="h-4 w-4" />}
+          {!isAudioEnabled && <MicOff className="h-4 w-4" />}
         </div>
       </div>
     </div>

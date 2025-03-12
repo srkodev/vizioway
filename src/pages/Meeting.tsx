@@ -1,81 +1,124 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { SignedIn } from "@clerk/clerk-react";
-import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import MeetingControls from "@/components/MeetingControls";
 import VideoTile from "@/components/VideoTile";
-import Chat from "@/components/Chat";
-import Participants from "@/components/Participants";
-import { apiClient } from "@/utils/api";
-import { 
-  useHMSActions, 
-  useHMSStore, 
-  selectPeers,
-  selectIsConnectedToRoom,
-  selectLocalPeer,
-  selectIsLocalAudioEnabled,
-  selectIsLocalVideoEnabled,
-  HMSRoomProvider,
-  selectIsPeerAudioEnabled
-} from "@100mslive/react-sdk";
+import SimpleChat from "@/components/SimpleChat";
+import SimpleParticipants from "@/components/SimpleParticipants";
+import { peerService } from "@/utils/peerService";
 
-const MeetingContent = () => {
+interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: Date;
+}
+
+interface Participant {
+  id: string;
+  name: string;
+  isLocal: boolean;
+  isAudioEnabled: boolean;
+  isVideoEnabled: boolean;
+}
+
+const Meeting = () => {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
-  const { user } = useUser();
-  const hmsActions = useHMSActions();
-  const isConnected = useHMSStore(selectIsConnectedToRoom);
-  const peers = useHMSStore(selectPeers);
-  const localPeer = useHMSStore(selectLocalPeer);
-  const isAudioEnabled = useHMSStore(selectIsLocalAudioEnabled);
-  const isVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
+  const { user, isAuthenticated } = useAuth();
   
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, { stream: MediaStream, name: string }>>(new Map());
+  
+  // Référence pour stocker le dernier ID de pair saisi
+  const lastPeerIdRef = useRef("");
 
+  // Rediriger vers la connexion si l'utilisateur n'est pas authentifié
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Initialiser PeerJS à l'entrée dans la réunion
   useEffect(() => {
     if (!roomId || !user) return;
     
-    const joinRoom = async () => {
+    const initializeMeeting = async () => {
       try {
         setIsLoading(true);
         
-        // Récupération du token de 100ms depuis notre backend
-        const userName = user.firstName || 'Utilisateur';
-        const token = await apiClient.getToken(roomId, userName);
+        const stream = await peerService.initialize(user.id, user.name);
+        setLocalStream(stream);
         
-        // Initialisation du SDK 100ms et rejoindre la salle
-        await hmsActions.join({
-          userName,
-          authToken: token
+        setParticipants([{
+          id: user.id,
+          name: user.name,
+          isLocal: true,
+          isAudioEnabled: true,
+          isVideoEnabled: true
+        }]);
+        
+        // Écouter les nouveaux participants
+        peerService.onPeerConnected((peerId, peerName, stream) => {
+          setRemoteStreams(prev => {
+            const newMap = new Map(prev);
+            newMap.set(peerId, { stream, name: peerName });
+            return newMap;
+          });
+          
+          setParticipants(prev => [...prev, {
+            id: peerId,
+            name: peerName,
+            isLocal: false,
+            isAudioEnabled: true,
+            isVideoEnabled: true
+          }]);
+          
+          toast.success(`${peerName} a rejoint la réunion`);
+        });
+        
+        // Écouter les déconnexions
+        peerService.onPeerDisconnected((peerId) => {
+          setRemoteStreams(prev => {
+            const newMap = new Map(prev);
+            const peerName = participants.find(p => p.id === peerId)?.name || "Un participant";
+            newMap.delete(peerId);
+            return newMap;
+          });
+          
+          setParticipants(prev => prev.filter(p => p.id !== peerId));
+          toast.info(`Un participant a quitté la réunion`);
         });
         
         toast.success("Vous avez rejoint la réunion");
       } catch (error) {
         console.error("Error joining room:", error);
         toast.error("Impossible de rejoindre la réunion");
-        // En cas d'erreur, retourner à la page d'accueil après 3 secondes
         setTimeout(() => navigate('/'), 3000);
       } finally {
         setIsLoading(false);
       }
     };
     
-    if (!isConnected) {
-      joinRoom();
-    }
+    initializeMeeting();
     
     return () => {
-      if (isConnected) {
-        hmsActions.leave();
-      }
+      peerService.disconnect();
     };
-  }, [roomId, user, hmsActions, isConnected, navigate]);
+  }, [roomId, user, navigate]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -89,7 +132,8 @@ const MeetingContent = () => {
 
   const handleAudioToggle = async () => {
     try {
-      await hmsActions.setLocalAudioEnabled(!isAudioEnabled);
+      await peerService.toggleAudio(!isAudioEnabled);
+      setIsAudioEnabled(!isAudioEnabled);
     } catch (error) {
       console.error("Error toggling audio:", error);
       toast.error("Impossible de modifier l'état du microphone");
@@ -98,7 +142,8 @@ const MeetingContent = () => {
 
   const handleVideoToggle = async () => {
     try {
-      await hmsActions.setLocalVideoEnabled(!isVideoEnabled);
+      await peerService.toggleVideo(!isVideoEnabled);
+      setIsVideoEnabled(!isVideoEnabled);
     } catch (error) {
       console.error("Error toggling video:", error);
       toast.error("Impossible de modifier l'état de la caméra");
@@ -106,34 +151,47 @@ const MeetingContent = () => {
   };
 
   const handleScreenShareToggle = async () => {
-    try {
-      if (isScreenSharing) {
-        await hmsActions.setScreenShareEnabled(false);
-      } else {
-        await hmsActions.setScreenShareEnabled(true);
-      }
-      setIsScreenSharing(!isScreenSharing);
-      toast.info(isScreenSharing ? "Partage d'écran arrêté" : "Partage d'écran démarré");
-    } catch (error) {
-      console.error("Error toggling screen share:", error);
-      toast.error("Impossible de partager l'écran");
-    }
+    // Cette fonctionnalité n'est pas implémentée avec PeerJS
+    toast.info("Le partage d'écran n'est pas disponible dans cette version gratuite");
   };
 
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
+  const handleSendMessage = (message: string) => {
+    if (!message.trim() || !user) return;
     
-    try {
-      await hmsActions.sendBroadcastMessage(message);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      toast.error("Impossible d'envoyer le message");
+    const newMessage: Message = {
+      id: crypto.randomUUID(),
+      senderId: user.id,
+      senderName: user.name,
+      text: message,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Dans une version réelle, on enverrait ce message à tous les participants
+    // (Non implémenté dans cette version simplifiée)
+  };
+
+  const handleJoinPeer = () => {
+    const peerId = prompt("Entrez l'ID du participant à rejoindre:");
+    
+    if (peerId && peerId.trim() && peerId !== user?.id) {
+      lastPeerIdRef.current = peerId.trim();
+      
+      toast.info("Connexion en cours...");
+      
+      // Essayer de se connecter au pair
+      peerService.callPeer(peerId.trim())
+        .catch(err => {
+          console.error("Erreur lors de la connexion au pair:", err);
+          toast.error("Impossible de rejoindre ce participant");
+        });
     }
   };
 
   const handleLeaveRoom = async () => {
     try {
-      await hmsActions.leave();
+      peerService.disconnect();
       navigate("/");
       toast.info("Vous avez quitté la réunion");
     } catch (error) {
@@ -142,11 +200,38 @@ const MeetingContent = () => {
     }
   };
 
+  // Si l'utilisateur n'est pas authentifié, ne pas rendre la page
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <Header appName="Vizioway" />
       <main className="pt-16 flex-1 flex">
         <div className="flex-1 flex flex-col p-4">
+          <div className="mb-4 bg-white dark:bg-gray-900 rounded-lg shadow p-4">
+            <div className="flex flex-wrap items-center justify-between">
+              <h2 className="text-xl font-semibold dark:text-white">Réunion: {roomId}</h2>
+              <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                <p className="text-sm dark:text-gray-400">Votre ID: {user?.id}</p>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(user?.id || "");
+                    toast.success("ID copié dans le presse-papier");
+                  }}
+                >
+                  Copier
+                </Button>
+                <Button size="sm" onClick={handleJoinPeer}>
+                  Rejoindre par ID
+                </Button>
+              </div>
+            </div>
+          </div>
+          
           <div className="flex-1 flex flex-col lg:flex-row gap-4">
             <div className="flex-1 bg-white dark:bg-gray-900 rounded-lg shadow p-4 h-full">
               {isLoading ? (
@@ -155,25 +240,42 @@ const MeetingContent = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                  {peers.length === 0 ? (
-                    <div className="col-span-full h-full flex items-center justify-center">
-                      <p className="text-gray-500 dark:text-gray-400">Aucun participant pour le moment</p>
+                  {/* Flux vidéo local */}
+                  {localStream && (
+                    <div className="aspect-video">
+                      <VideoTile
+                        stream={localStream}
+                        peerName={user?.name || "Vous"}
+                        isLocal={true}
+                        isAudioEnabled={isAudioEnabled}
+                      />
                     </div>
-                  ) : (
-                    peers.map(peer => {
-                      const isPeerAudioEnabled = useHMSStore(selectIsPeerAudioEnabled(peer.id));
-                      
-                      return (
-                        <div key={peer.id} className="aspect-video">
-                          <VideoTile
-                            peerId={peer.id}
-                            peerName={peer.name}
-                            isLocal={peer.isLocal}
-                            isAudioEnabled={isPeerAudioEnabled}
-                          />
-                        </div>
-                      );
-                    })
+                  )}
+                  
+                  {/* Flux vidéo distants */}
+                  {Array.from(remoteStreams.entries()).map(([peerId, { stream, name }]) => (
+                    <div key={peerId} className="aspect-video">
+                      <VideoTile
+                        stream={stream}
+                        peerName={name}
+                        isLocal={false}
+                        isAudioEnabled={true}
+                      />
+                    </div>
+                  ))}
+                  
+                  {/* Message si aucun participant */}
+                  {remoteStreams.size === 0 && localStream && (
+                    <div className="col-span-full h-full flex items-center justify-center">
+                      <div className="text-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                          Aucun autre participant pour le moment
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Partagez votre ID ou invitez des participants à rejoindre avec le code: <span className="font-bold">{roomId}</span>
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -182,14 +284,17 @@ const MeetingContent = () => {
             {(isChatOpen || isParticipantsOpen) && (
               <div className="w-full lg:w-80 h-80 lg:h-auto">
                 {isChatOpen && (
-                  <Chat 
+                  <SimpleChat 
                     onClose={toggleChat} 
                     onSendMessage={handleSendMessage}
+                    messages={messages}
+                    currentUserId={user?.id || ""}
                   />
                 )}
                 {isParticipantsOpen && (
-                  <Participants 
+                  <SimpleParticipants 
                     onClose={toggleParticipants}
+                    participants={participants}
                   />
                 )}
               </div>
@@ -212,16 +317,6 @@ const MeetingContent = () => {
         </div>
       </main>
     </div>
-  );
-};
-
-const Meeting = () => {
-  return (
-    <SignedIn>
-      <HMSRoomProvider>
-        <MeetingContent />
-      </HMSRoomProvider>
-    </SignedIn>
   );
 };
 

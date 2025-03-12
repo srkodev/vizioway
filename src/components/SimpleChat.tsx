@@ -2,42 +2,38 @@
 import { useState, useEffect, useRef } from "react";
 import { Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { 
-  useHMSActions, 
-  useHMSStore, 
-  selectHMSMessages
-} from "@100mslive/react-sdk";
 
-interface ChatProps {
-  onClose: () => void;
-  onSendMessage?: (message: string) => void;
+interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: Date;
 }
 
-const Chat = ({ onClose, onSendMessage }: ChatProps) => {
+interface SimpleChatProps {
+  onClose: () => void;
+  onSendMessage: (message: string) => void;
+  messages: Message[];
+  currentUserId: string;
+}
+
+const SimpleChat = ({ onClose, onSendMessage, messages, currentUserId }: SimpleChatProps) => {
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hmsActions = useHMSActions();
-  const hmsMessages = useHMSStore(selectHMSMessages);
   
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (message.trim()) {
-      if (onSendMessage) {
-        // Use the callback function
-        onSendMessage(message.trim());
-      } else {
-        // Use the HMS SDK to send a real message
-        hmsActions.sendBroadcastMessage(message.trim());
-      }
-      
+      onSendMessage(message.trim());
       setMessage("");
     }
   };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [hmsMessages]);
+  }, [messages]);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg flex flex-col h-full">
@@ -49,18 +45,18 @@ const Chat = ({ onClose, onSendMessage }: ChatProps) => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {hmsMessages.length === 0 ? (
+        {messages.length === 0 ? (
           <p className="text-gray-500 text-center py-8 dark:text-gray-400">
             Aucun message pour le moment
           </p>
         ) : (
-          hmsMessages.map((msg) => (
+          messages.map((msg) => (
             <MessageItem 
               key={msg.id} 
               sender={msg.senderName} 
-              text={msg.message}
-              time={new Date(msg.time).toLocaleTimeString()}
-              isFromMe={msg.sender === "local"} 
+              text={msg.text}
+              time={msg.timestamp.toLocaleTimeString()}
+              isFromMe={msg.senderId === currentUserId} 
             />
           ))
         )}
@@ -102,4 +98,4 @@ const MessageItem = ({ sender, text, time, isFromMe }: MessageItemProps) => (
   </div>
 );
 
-export default Chat;
+export default SimpleChat;
