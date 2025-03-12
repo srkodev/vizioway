@@ -13,12 +13,20 @@ export const apiClient = {
    */
   async createRoom(name?: string) {
     try {
-      // For simplicity, we'll just return a random ID
-      // In a real app, this would create a room via 100ms API
-      return {
-        id: Math.random().toString(36).substring(2, 12),
-        name: name || 'Réunion sans nom'
-      };
+      const response = await fetch(`${API_URL}/rooms/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: name || 'Réunion sans nom' }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erreur lors de la création de la salle');
+      }
+      
+      return await response.json();
     } catch (error) {
       console.error('Erreur lors de la création de la salle:', error);
       toast.error('Impossible de créer la salle de réunion');
@@ -31,19 +39,22 @@ export const apiClient = {
    */
   async getToken(roomId: string, userName: string, role = 'host') {
     try {
-      // For development, we can use 100ms test token
-      // In production, this should call your backend API
-      const response = await fetch(`https://prod-in2.100ms.live/hmsapi/get-token`, {
+      const response = await fetch(HMS_TOKEN_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           room_id: roomId,
-          user_id: `${userName}-${Date.now()}`,
+          user_name: userName,
           role
         }),
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erreur lors de l\'obtention du token');
+      }
       
       const data = await response.json();
       
@@ -60,11 +71,29 @@ export const apiClient = {
   },
   
   /**
-   * Rejoind une salle avec un code
+   * Rejoint une salle avec un code
    */
   async joinWithCode(roomCode: string, userName: string) {
-    // In a real app, this would validate the code and get room details
-    // For simplicity, we'll just return the code as the room ID
-    return roomCode;
+    try {
+      const response = await fetch(`${API_URL}/rooms/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: roomCode, userName }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Code de réunion invalide');
+      }
+      
+      const data = await response.json();
+      return data.roomId;
+    } catch (error) {
+      console.error('Erreur lors de la jointure à la salle:', error);
+      toast.error('Code de réunion invalide');
+      throw error;
+    }
   }
 };

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
@@ -8,6 +9,7 @@ import MeetingControls from "@/components/MeetingControls";
 import VideoTile from "@/components/VideoTile";
 import Chat from "@/components/Chat";
 import Participants from "@/components/Participants";
+import { apiClient } from "@/utils/api";
 import { 
   useHMSActions, 
   useHMSStore, 
@@ -43,19 +45,22 @@ const MeetingContent = () => {
       try {
         setIsLoading(true);
         
-        // In a real implementation, we would fetch a token from our backend
+        // Récupération du token de 100ms depuis notre backend
         const userName = user.firstName || 'Utilisateur';
+        const token = await apiClient.getToken(roomId, userName);
         
-        // Initialize the 100ms SDK and join the room
+        // Initialisation du SDK 100ms et rejoindre la salle
         await hmsActions.join({
           userName,
-          authToken: roomId // Using room ID as auth token for simplicity
+          authToken: token
         });
         
         toast.success("Vous avez rejoint la réunion");
       } catch (error) {
         console.error("Error joining room:", error);
         toast.error("Impossible de rejoindre la réunion");
+        // En cas d'erreur, retourner à la page d'accueil après 3 secondes
+        setTimeout(() => navigate('/'), 3000);
       } finally {
         setIsLoading(false);
       }
