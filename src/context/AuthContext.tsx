@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { apiClient, setAuthToken, getAuthToken } from "@/utils/api";
+import { apiClient, setAuthToken, getAuthToken, ApiResponse } from "@/utils/api";
 import { toast } from "sonner";
 
 interface User {

@@ -17,6 +17,19 @@ export const getAuthToken = (): string | null => {
   return authToken;
 };
 
+// Type pour les réponses de l'API
+interface ApiSuccessResponse<T> {
+  success: true;
+  data: T;
+}
+
+interface ApiErrorResponse {
+  success: false;
+  message: string;
+}
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
 // Options de base pour les requêtes fetch
 const getBaseOptions = (options?: RequestInit): RequestInit => {
   const baseOptions: RequestInit = {
@@ -32,7 +45,7 @@ const getBaseOptions = (options?: RequestInit): RequestInit => {
 };
 
 // Fonction pour gérer les erreurs de requête
-const handleRequestError = (error: any, defaultMessage: string) => {
+const handleRequestError = (error: any, defaultMessage: string): ApiErrorResponse => {
   console.error(defaultMessage, error);
   
   if (error.response) {
@@ -53,7 +66,7 @@ export const apiClient = {
   /**
    * S'inscrire avec un email et un mot de passe
    */
-  async register(userData: { fullName: string, username: string, email: string, password: string }) {
+  async register(userData: { fullName: string, username: string, email: string, password: string }): Promise<ApiResponse<{token: string; user: any}>> {
     try {
       const response = await fetch(`${BASE_URL}/users/register`, {
         method: 'POST',
@@ -65,7 +78,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Erreur lors de l\'inscription');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de l\'inscription' };
       }
       
       // Stocker le token
@@ -83,7 +96,7 @@ export const apiClient = {
   /**
    * Se connecter avec un email et un mot de passe
    */
-  async login(credentials: { email: string, password: string }) {
+  async login(credentials: { email: string, password: string }): Promise<ApiResponse<{token: string; user: any}>> {
     try {
       const response = await fetch(`${BASE_URL}/users/login`, {
         method: 'POST',
@@ -95,7 +108,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Erreur lors de la connexion');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de la connexion' };
       }
       
       // Stocker le token
@@ -113,7 +126,7 @@ export const apiClient = {
   /**
    * Connexion en tant qu'invité
    */
-  async guestLogin(username: string) {
+  async guestLogin(username: string): Promise<ApiResponse<{token: string; user: any}>> {
     try {
       const response = await fetch(`${BASE_URL}/users/guest`, {
         method: 'POST',
@@ -125,7 +138,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Erreur lors de la connexion');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de la connexion' };
       }
       
       // Stocker le token
@@ -143,7 +156,7 @@ export const apiClient = {
   /**
    * Obtenir les informations de l'utilisateur actuel
    */
-  async getCurrentUser() {
+  async getCurrentUser(): Promise<ApiResponse<any>> {
     try {
       if (!authToken) {
         return { success: false, message: 'Non authentifié' };
@@ -165,7 +178,7 @@ export const apiClient = {
           toast.error(data.message || 'Erreur lors de la récupération des données utilisateur');
         }
         
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de la récupération des données utilisateur' };
       }
       
       return { success: true, data: data.data };
@@ -177,7 +190,7 @@ export const apiClient = {
   /**
    * Créer une nouvelle salle de réunion
    */
-  async createRoom(name?: string) {
+  async createRoom(name?: string): Promise<ApiResponse<{roomId: string}>> {
     try {
       const response = await fetch(`${BASE_URL}/rooms/create`, {
         method: 'POST',
@@ -189,7 +202,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Erreur lors de la création de la salle');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de la création de la salle' };
       }
       
       return { success: true, data: data.data };
@@ -201,7 +214,7 @@ export const apiClient = {
   /**
    * Rejoindre une salle avec un code
    */
-  async joinRoomByCode(code: string) {
+  async joinRoomByCode(code: string): Promise<ApiResponse<{roomId: string}>> {
     try {
       const response = await fetch(`${BASE_URL}/rooms/join-by-code`, {
         method: 'POST',
@@ -213,7 +226,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Code de réunion invalide');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Code de réunion invalide' };
       }
       
       return { success: true, data: data.data };
@@ -225,7 +238,7 @@ export const apiClient = {
   /**
    * Obtenir les détails d'une salle
    */
-  async getRoomDetails(roomId: string) {
+  async getRoomDetails(roomId: string): Promise<ApiResponse<{name: string; code: string}>> {
     try {
       const response = await fetch(`${BASE_URL}/rooms/${roomId}`, {
         ...getBaseOptions()
@@ -235,7 +248,7 @@ export const apiClient = {
       
       if (!response.ok) {
         toast.error(data.message || 'Erreur lors de la récupération des détails de la salle');
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Erreur lors de la récupération des détails de la salle' };
       }
       
       return { success: true, data: data.data };
