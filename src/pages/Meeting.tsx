@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useUser, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import MeetingControls from "@/components/MeetingControls";
@@ -30,7 +29,7 @@ interface Participant {
 const Meeting = () => {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn } = useAuth();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -43,10 +42,15 @@ const Meeting = () => {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, { stream: MediaStream, name: string }>>(new Map());
   
-  // Référence pour stocker le dernier ID de pair saisi
   const lastPeerIdRef = useRef("");
 
-  // Initialiser PeerJS à l'entrée dans la réunion
+  useEffect(() => {
+    if (!isSignedIn) {
+      toast.error("Vous devez être connecté pour accéder à une réunion");
+      navigate("/");
+    }
+  }, [isSignedIn, navigate]);
+
   useEffect(() => {
     if (!roomId || !user) return;
     
@@ -68,7 +72,6 @@ const Meeting = () => {
           isVideoEnabled: true
         }]);
         
-        // Écouter les nouveaux participants
         peerService.onPeerConnected((peerId, peerName, stream) => {
           setRemoteStreams(prev => {
             const newMap = new Map(prev);
@@ -87,7 +90,6 @@ const Meeting = () => {
           toast.success(`${peerName} a rejoint la réunion`);
         });
         
-        // Écouter les déconnexions
         peerService.onPeerDisconnected((peerId) => {
           setRemoteStreams(prev => {
             const newMap = new Map(prev);
@@ -115,7 +117,7 @@ const Meeting = () => {
     return () => {
       peerService.disconnect();
     };
-  }, [roomId, user, navigate]);
+  }, [roomId, user, navigate, participants]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -148,7 +150,6 @@ const Meeting = () => {
   };
 
   const handleScreenShareToggle = async () => {
-    // Cette fonctionnalité n'est pas implémentée avec PeerJS
     toast.info("Le partage d'écran n'est pas disponible dans cette version gratuite");
   };
 
@@ -164,9 +165,6 @@ const Meeting = () => {
     };
     
     setMessages(prev => [...prev, newMessage]);
-    
-    // Dans une version réelle, on enverrait ce message à tous les participants
-    // (Non implémenté dans cette version simplifiée)
   };
 
   const handleJoinPeer = () => {
@@ -177,7 +175,6 @@ const Meeting = () => {
       
       toast.info("Connexion en cours...");
       
-      // Essayer de se connecter au pair
       peerService.callPeer(peerId.trim())
         .catch(err => {
           console.error("Erreur lors de la connexion au pair:", err);
@@ -197,122 +194,119 @@ const Meeting = () => {
     }
   };
 
+  if (!isSignedIn) {
+    return null;
+  }
+
   return (
-    <>
-      <SignedIn>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-          <Header appName="Vizioway" />
-          <main className="pt-16 flex-1 flex">
-            <div className="flex-1 flex flex-col p-4">
-              <div className="mb-4 bg-white dark:bg-gray-900 rounded-lg shadow p-4">
-                <div className="flex flex-wrap items-center justify-between">
-                  <h2 className="text-xl font-semibold dark:text-white">Réunion: {roomId}</h2>
-                  <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                    <p className="text-sm dark:text-gray-400">Votre ID: {user?.id}</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => {
-                        navigator.clipboard.writeText(user?.id || "");
-                        toast.success("ID copié dans le presse-papier");
-                      }}
-                    >
-                      Copier
-                    </Button>
-                    <Button size="sm" onClick={handleJoinPeer}>
-                      Rejoindre par ID
-                    </Button>
-                  </div>
-                </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+      <Header appName="Vizioway" />
+      <main className="pt-16 flex-1 flex">
+        <div className="flex-1 flex flex-col p-4">
+          <div className="mb-4 bg-white dark:bg-gray-900 rounded-lg shadow p-4">
+            <div className="flex flex-wrap items-center justify-between">
+              <h2 className="text-xl font-semibold dark:text-white">Réunion: {roomId}</h2>
+              <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                <p className="text-sm dark:text-gray-400">Votre ID: {user?.id}</p>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(user?.id || "");
+                    toast.success("ID copié dans le presse-papier");
+                  }}
+                >
+                  Copier
+                </Button>
+                <Button size="sm" onClick={handleJoinPeer}>
+                  Rejoindre par ID
+                </Button>
               </div>
-              
-              <div className="flex-1 flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 bg-white dark:bg-gray-900 rounded-lg shadow p-4 h-full">
-                  {isLoading ? (
-                    <div className="h-full flex items-center justify-center">
-                      <p className="text-gray-500 dark:text-gray-400">Connexion à la réunion...</p>
+            </div>
+          </div>
+          
+          <div className="flex-1 flex flex-col lg:flex-row gap-4">
+            <div className="flex-1 bg-white dark:bg-gray-900 rounded-lg shadow p-4 h-full">
+              {isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-gray-500 dark:text-gray-400">Connexion à la réunion...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  {localStream && (
+                    <div className="aspect-video">
+                      <VideoTile
+                        stream={localStream}
+                        peerName={user?.fullName || user?.username || "Vous"}
+                        isLocal={true}
+                        isAudioEnabled={isAudioEnabled}
+                      />
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-                      {localStream && (
-                        <div className="aspect-video">
-                          <VideoTile
-                            stream={localStream}
-                            peerName={user?.fullName || user?.username || "Vous"}
-                            isLocal={true}
-                            isAudioEnabled={isAudioEnabled}
-                          />
-                        </div>
-                      )}
-                      
-                      {Array.from(remoteStreams.entries()).map(([peerId, { stream, name }]) => (
-                        <div key={peerId} className="aspect-video">
-                          <VideoTile
-                            stream={stream}
-                            peerName={name}
-                            isLocal={false}
-                            isAudioEnabled={true}
-                          />
-                        </div>
-                      ))}
-                      
-                      {remoteStreams.size === 0 && localStream && (
-                        <div className="col-span-full h-full flex items-center justify-center">
-                          <div className="text-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                            <p className="text-gray-500 dark:text-gray-400 mb-4">
-                              Aucun autre participant pour le moment
-                            </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Partagez votre ID ou invitez des participants à rejoindre avec le code: <span className="font-bold">{roomId}</span>
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                  )}
+                  
+                  {Array.from(remoteStreams.entries()).map(([peerId, { stream, name }]) => (
+                    <div key={peerId} className="aspect-video">
+                      <VideoTile
+                        stream={stream}
+                        peerName={name}
+                        isLocal={false}
+                        isAudioEnabled={true}
+                      />
+                    </div>
+                  ))}
+                  
+                  {remoteStreams.size === 0 && localStream && (
+                    <div className="col-span-full h-full flex items-center justify-center">
+                      <div className="text-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                          Aucun autre participant pour le moment
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Partagez votre ID ou invitez des participants à rejoindre avec le code: <span className="font-bold">{roomId}</span>
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-                
-                {(isChatOpen || isParticipantsOpen) && (
-                  <div className="w-full lg:w-80 h-80 lg:h-auto">
-                    {isChatOpen && (
-                      <SimpleChat 
-                        onClose={toggleChat} 
-                        onSendMessage={handleSendMessage}
-                        messages={messages}
-                        currentUserId={user?.id || ""}
-                      />
-                    )}
-                    {isParticipantsOpen && (
-                      <SimpleParticipants 
-                        onClose={toggleParticipants}
-                        participants={participants}
-                      />
-                    )}
-                  </div>
+              )}
+            </div>
+            
+            {(isChatOpen || isParticipantsOpen) && (
+              <div className="w-full lg:w-80 h-80 lg:h-auto">
+                {isChatOpen && (
+                  <SimpleChat 
+                    onClose={toggleChat} 
+                    onSendMessage={handleSendMessage}
+                    messages={messages}
+                    currentUserId={user?.id || ""}
+                  />
+                )}
+                {isParticipantsOpen && (
+                  <SimpleParticipants 
+                    onClose={toggleParticipants}
+                    participants={participants}
+                  />
                 )}
               </div>
-              
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 mt-4">
-                <MeetingControls 
-                  onChatToggle={toggleChat}
-                  onParticipantsToggle={toggleParticipants}
-                  onAudioToggle={handleAudioToggle}
-                  onVideoToggle={handleVideoToggle}
-                  onScreenShareToggle={handleScreenShareToggle}
-                  onLeaveRoom={handleLeaveRoom}
-                  isAudioEnabled={isAudioEnabled}
-                  isVideoEnabled={isVideoEnabled}
-                  isScreenShared={isScreenSharing}
-                />
-              </div>
-            </div>
-          </main>
+            )}
+          </div>
+          
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 mt-4">
+            <MeetingControls 
+              onChatToggle={toggleChat}
+              onParticipantsToggle={toggleParticipants}
+              onAudioToggle={handleAudioToggle}
+              onVideoToggle={handleVideoToggle}
+              onScreenShareToggle={handleScreenShareToggle}
+              onLeaveRoom={handleLeaveRoom}
+              isAudioEnabled={isAudioEnabled}
+              isVideoEnabled={isVideoEnabled}
+              isScreenShared={isScreenSharing}
+            />
+          </div>
         </div>
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
+      </main>
+    </div>
   );
 };
 

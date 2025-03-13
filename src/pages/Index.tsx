@@ -1,16 +1,18 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import LoginForm from "@/components/LoginForm";
 
 const Index = () => {
   const [meetingCode, setMeetingCode] = useState("");
   const navigate = useNavigate();
+  const { isSignedIn } = useAuth();
 
   const handleJoinMeeting = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +30,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <SignedIn>
+      {isSignedIn ? (
         <>
           <Header appName="Vizioway" />
           <main className="pt-24 container mx-auto px-4 pb-12">
@@ -76,8 +78,7 @@ const Index = () => {
             </div>
           </main>
         </>
-      </SignedIn>
-      <SignedOut>
+      ) : (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
           <div className="max-w-md w-full px-6 py-8">
             <div className="text-center mb-8">
@@ -89,11 +90,11 @@ const Index = () => {
               </p>
             </div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-              <SignIn />
+              <LoginForm />
             </div>
           </div>
         </div>
-      </SignedOut>
+      )}
     </div>
   );
 };
