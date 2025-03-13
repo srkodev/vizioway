@@ -2,29 +2,80 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { generateToken } = require('../utils/tokenGenerator');
+const jwt = require('jsonwebtoken');
 
-// Stockage des salles en mémoire (à remplacer par une BD en production)
+// Base de données simulée (en production, utiliser MongoDB ou une autre BD)
 const rooms = new Map();
 
-// Créer une nouvelle salle
-router.post('/', (req, res) => {
+// Middleware pour vérifier l'authentification
+const authenticate = (req, res, next) => {
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Non autorisé'
+      });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'vizioway-super-secret-key');
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Erreur d\'authentification:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Token invalide'
+    });
+  }
+};
+
+// Générer un code de salle facile à retenir
+const generateRoomCode = () => {
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    code += characters.charAt(randomIndex);
+  }
+  
+  return code;
+};
+
+// Créer une nouvelle salle
+router.post('/create', authenticate, (req, res) => {
+  try {
+    const { userId, fullName } = req.user;
+    const { name } = req.body;
+    
     const roomId = uuidv4();
+    const roomCode = generateRoomCode();
+    
     const newRoom = {
       id: roomId,
-      name: req.body.name || `Salle ${roomId.substring(0, 8)}`,
+      code: roomCode,
+      name: name || `Salle de ${fullName}`,
+      createdBy: userId,
       createdAt: new Date(),
       participants: [],
-      settings: req.body.settings || { maxParticipants: 10 }
+      settings: {
+        maxParticipants: 10,
+        isScreenShareEnabled: true,
+        isChatEnabled: true,
+        isRecordingEnabled: false
+      }
     };
-
+    
     rooms.set(roomId, newRoom);
-
+    
     res.status(201).json({
       success: true,
       data: {
         roomId,
+        roomCode,
         name: newRoom.name
       }
     });
@@ -32,123 +83,136 @@ router.post('/', (req, res) => {
     console.error('Erreur lors de la création de la salle:', error);
     res.status(500).json({
       success: false,
-      message: 'Impossible de créer la salle'
+      message: 'Erreur serveur lors de la création de la salle'
+    });
+  }
+});
+
+// Rejoindre une salle avec un code
+router.post('/join-by-code', authenticate, (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Code de salle requis'
+      });
+    }
+    
+    // Rechercher la salle par code
+    let foundRoom = null;
+    let roomId = null;
+    
+    for (const [id, room] of rooms.entries()) {
+      if (room.code === code.toUpperCase()) {
+        foundRoom = room;
+        roomId = id;
+        break;
+      }
+    }
+    
+    if (!foundRoom) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salle non trouvée avec ce code'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        roomId,
+        roomCode: foundRoom.code,
+        name: foundRoom.name
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la recherche de la salle:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la recherche de la salle'
     });
   }
 });
 
 // Obtenir les détails d'une salle
-router.get('/:roomId', (req, res) => {
-  const { roomId } = req.params;
-  
-  if (!rooms.has(roomId)) {
-    return res.status(404).json({
-      success: false,
-      message: 'Salle non trouvée'
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: rooms.get(roomId)
-  });
-});
-
-// Joindre une salle (obtenir un token)
-router.post('/:roomId/join', (req, res) => {
+router.get('/:roomId', authenticate, (req, res) => {
   try {
     const { roomId } = req.params;
-    const { name, role = 'guest' } = req.body;
     
-    if (!name) {
-      return res.status(400).json({
+    if (!rooms.has(roomId)) {
+      return res.status(404).json({
         success: false,
-        message: 'Le nom est requis'
+        message: 'Salle non trouvée'
       });
     }
     
-    // Vérifier si la salle existe
-    if (!rooms.has(roomId)) {
-      // Create room if it doesn't exist (only in dev)
-      if (process.env.NODE_ENV === 'development') {
-        const newRoom = {
-          id: roomId,
-          name: `Salle ${roomId.substring(0, 8)}`,
-          createdAt: new Date(),
-          participants: [],
-          settings: { maxParticipants: 10 }
-        };
-        rooms.set(roomId, newRoom);
-      } else {
-        return res.status(404).json({
-          success: false,
-          message: 'Salle non trouvée'
-        });
-      }
-    }
-    
-    // Generate token for 100ms (or our own jwt token for simulation)
-    const token = generateToken({
-      roomId,
-      userId: uuidv4(),
-      name,
-      role
-    });
-    
     const room = rooms.get(roomId);
-    const participantId = uuidv4();
-    
-    // Add participant to room
-    room.participants.push({
-      id: participantId,
-      name,
-      role,
-      joinedAt: new Date()
-    });
     
     res.status(200).json({
       success: true,
       data: {
-        token,
-        roomId,
-        participantId
+        id: room.id,
+        code: room.code,
+        name: room.name,
+        createdBy: room.createdBy,
+        createdAt: room.createdAt,
+        settings: room.settings
       }
     });
   } catch (error) {
-    console.error('Erreur lors de la création du token:', error);
+    console.error('Erreur lors de la récupération des détails de la salle:', error);
     res.status(500).json({
       success: false,
-      message: 'Impossible de joindre la salle'
+      message: 'Erreur serveur'
     });
   }
 });
 
-// Quitter une salle
-router.post('/:roomId/leave', (req, res) => {
-  const { roomId } = req.params;
-  const { participantId } = req.body;
-  
-  if (!rooms.has(roomId)) {
-    return res.status(404).json({
+// Mettre à jour les paramètres d'une salle
+router.put('/:roomId/settings', authenticate, (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { userId } = req.user;
+    const { settings } = req.body;
+    
+    if (!rooms.has(roomId)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salle non trouvée'
+      });
+    }
+    
+    const room = rooms.get(roomId);
+    
+    // Vérifier que l'utilisateur est le créateur de la salle
+    if (room.createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul le créateur de la salle peut modifier les paramètres'
+      });
+    }
+    
+    // Mettre à jour les paramètres
+    room.settings = {
+      ...room.settings,
+      ...settings
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        settings: room.settings
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des paramètres:', error);
+    res.status(500).json({
       success: false,
-      message: 'Salle non trouvée'
+      message: 'Erreur serveur'
     });
   }
-  
-  const room = rooms.get(roomId);
-  
-  // Remove participant
-  room.participants = room.participants.filter(p => p.id !== participantId);
-  
-  // If room is empty, delete it
-  if (room.participants.length === 0) {
-    rooms.delete(roomId);
-  }
-  
-  res.status(200).json({
-    success: true,
-    message: 'Salle quittée avec succès'
-  });
 });
 
 module.exports = router;

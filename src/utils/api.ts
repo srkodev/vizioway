@@ -1,99 +1,246 @@
 
 import { toast } from "sonner";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const HMS_TOKEN_ENDPOINT = import.meta.env.VITE_HMS_TOKEN_ENDPOINT;
+// URL de base de l'API
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Token d'authentification
+let authToken: string | null = null;
+
+// Fonction pour définir le token d'authentification
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+};
+
+// Fonction pour obtenir le token d'authentification
+export const getAuthToken = (): string | null => {
+  return authToken;
+};
+
+// Options de base pour les requêtes fetch
+const getBaseOptions = (options?: RequestInit): RequestInit => {
+  const baseOptions: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+      ...(options?.headers || {})
+    },
+    ...options
+  };
+  
+  return baseOptions;
+};
+
+// Fonction pour gérer les erreurs de requête
+const handleRequestError = (error: any, defaultMessage: string) => {
+  console.error(defaultMessage, error);
+  
+  if (error.response) {
+    return { 
+      success: false, 
+      message: error.response.data?.message || defaultMessage 
+    };
+  }
+  
+  toast.error(defaultMessage);
+  return { success: false, message: defaultMessage };
+};
 
 /**
  * Client API pour communiquer avec le backend
  */
 export const apiClient = {
   /**
-   * Crée une nouvelle salle de réunion
+   * S'inscrire avec un email et un mot de passe
+   */
+  async register(userData: { fullName: string, username: string, email: string, password: string }) {
+    try {
+      const response = await fetch(`${BASE_URL}/users/register`, {
+        method: 'POST',
+        ...getBaseOptions(),
+        body: JSON.stringify(userData)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast.error(data.message || 'Erreur lors de l\'inscription');
+        return { success: false, message: data.message };
+      }
+      
+      // Stocker le token
+      if (data.data?.token) {
+        setAuthToken(data.data.token);
+        localStorage.setItem('authToken', data.data.token);
+      }
+      
+      return { success: true, data: data.data };
+    } catch (error) {
+      return handleRequestError(error, 'Erreur lors de l\'inscription');
+    }
+  },
+  
+  /**
+   * Se connecter avec un email et un mot de passe
+   */
+  async login(credentials: { email: string, password: string }) {
+    try {
+      const response = await fetch(`${BASE_URL}/users/login`, {
+        method: 'POST',
+        ...getBaseOptions(),
+        body: JSON.stringify(credentials)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast.error(data.message || 'Erreur lors de la connexion');
+        return { success: false, message: data.message };
+      }
+      
+      // Stocker le token
+      if (data.data?.token) {
+        setAuthToken(data.data.token);
+        localStorage.setItem('authToken', data.data.token);
+      }
+      
+      return { success: true, data: data.data };
+    } catch (error) {
+      return handleRequestError(error, 'Erreur lors de la connexion');
+    }
+  },
+  
+  /**
+   * Connexion en tant qu'invité
+   */
+  async guestLogin(username: string) {
+    try {
+      const response = await fetch(`${BASE_URL}/users/guest`, {
+        method: 'POST',
+        ...getBaseOptions(),
+        body: JSON.stringify({ username })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast.error(data.message || 'Erreur lors de la connexion');
+        return { success: false, message: data.message };
+      }
+      
+      // Stocker le token
+      if (data.data?.token) {
+        setAuthToken(data.data.token);
+        localStorage.setItem('authToken', data.data.token);
+      }
+      
+      return { success: true, data: data.data };
+    } catch (error) {
+      return handleRequestError(error, 'Erreur lors de la connexion');
+    }
+  },
+  
+  /**
+   * Obtenir les informations de l'utilisateur actuel
+   */
+  async getCurrentUser() {
+    try {
+      if (!authToken) {
+        return { success: false, message: 'Non authentifié' };
+      }
+      
+      const response = await fetch(`${BASE_URL}/users/me`, {
+        ...getBaseOptions()
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token expiré ou invalide
+          setAuthToken(null);
+          localStorage.removeItem('authToken');
+          toast.error('Session expirée, veuillez vous reconnecter');
+        } else {
+          toast.error(data.message || 'Erreur lors de la récupération des données utilisateur');
+        }
+        
+        return { success: false, message: data.message };
+      }
+      
+      return { success: true, data: data.data };
+    } catch (error) {
+      return handleRequestError(error, 'Erreur lors de la récupération des données utilisateur');
+    }
+  },
+  
+  /**
+   * Créer une nouvelle salle de réunion
    */
   async createRoom(name?: string) {
     try {
-      const response = await fetch(`${API_URL}/rooms/create`, {
+      const response = await fetch(`${BASE_URL}/rooms/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: name || 'Réunion sans nom' }),
+        ...getBaseOptions(),
+        body: JSON.stringify({ name: name || 'Nouvelle réunion' })
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erreur lors de la création de la salle');
+        toast.error(data.message || 'Erreur lors de la création de la salle');
+        return { success: false, message: data.message };
       }
       
-      return await response.json();
+      return { success: true, data: data.data };
     } catch (error) {
-      console.error('Erreur lors de la création de la salle:', error);
-      toast.error('Impossible de créer la salle de réunion');
-      throw error;
+      return handleRequestError(error, 'Erreur lors de la création de la salle');
     }
   },
   
   /**
-   * Obtient un token pour rejoindre une salle
+   * Rejoindre une salle avec un code
    */
-  async getToken(roomId: string, userName: string, role = 'host') {
+  async joinRoomByCode(code: string) {
     try {
-      const response = await fetch(HMS_TOKEN_ENDPOINT, {
+      const response = await fetch(`${BASE_URL}/rooms/join-by-code`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          room_id: roomId,
-          user_name: userName,
-          role
-        }),
+        ...getBaseOptions(),
+        body: JSON.stringify({ code })
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erreur lors de l\'obtention du token');
-      }
       
       const data = await response.json();
       
-      if (!data.token) {
-        throw new Error('Impossible d\'obtenir un token');
+      if (!response.ok) {
+        toast.error(data.message || 'Code de réunion invalide');
+        return { success: false, message: data.message };
       }
       
-      return data.token;
+      return { success: true, data: data.data };
     } catch (error) {
-      console.error('Erreur lors de l\'obtention du token:', error);
-      toast.error('Impossible de rejoindre la réunion');
-      throw error;
+      return handleRequestError(error, 'Erreur lors de la jointure à la salle');
     }
   },
   
   /**
-   * Rejoint une salle avec un code
+   * Obtenir les détails d'une salle
    */
-  async joinWithCode(roomCode: string, userName: string) {
+  async getRoomDetails(roomId: string) {
     try {
-      const response = await fetch(`${API_URL}/rooms/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code: roomCode, userName }),
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}`, {
+        ...getBaseOptions()
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Code de réunion invalide');
+        toast.error(data.message || 'Erreur lors de la récupération des détails de la salle');
+        return { success: false, message: data.message };
       }
       
-      const data = await response.json();
-      return data.roomId;
+      return { success: true, data: data.data };
     } catch (error) {
-      console.error('Erreur lors de la jointure à la salle:', error);
-      toast.error('Code de réunion invalide');
-      throw error;
+      return handleRequestError(error, 'Erreur lors de la récupération des détails de la salle');
     }
-  }
+  },
 };

@@ -6,27 +6,66 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { v4 as uuidv4 } from "uuid";
+import { apiClient } from "@/utils/api";
 import LoginForm from "@/components/LoginForm";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [meetingCode, setMeetingCode] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoading } = useAuth();
 
-  const handleJoinMeeting = (e: React.FormEvent) => {
+  const handleJoinMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!meetingCode.trim()) {
       toast.error("Veuillez entrer un code de réunion valide");
       return;
     }
-    navigate(`/meeting/${meetingCode.trim()}`);
+    
+    try {
+      setIsJoining(true);
+      
+      const response = await apiClient.joinRoomByCode(meetingCode.trim());
+      
+      if (response.success && response.data?.roomId) {
+        navigate(`/meeting/${response.data.roomId}`);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la jointure à la réunion:", error);
+    } finally {
+      setIsJoining(false);
+    }
   };
 
-  const handleCreateMeeting = () => {
-    const newMeetingId = uuidv4().substring(0, 8);
-    navigate(`/meeting/${newMeetingId}`);
+  const handleCreateMeeting = async () => {
+    try {
+      setIsCreating(true);
+      
+      const response = await apiClient.createRoom();
+      
+      if (response.success && response.data?.roomId) {
+        navigate(`/meeting/${response.data.roomId}`);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la création de la réunion:", error);
+    } finally {
+      setIsCreating(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-500 dark:text-gray-400">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -49,14 +88,22 @@ const Index = () => {
                     onClick={handleCreateMeeting}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                     size="lg"
+                    disabled={isCreating}
                   >
-                    Créer une réunion
+                    {isCreating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Création...
+                      </>
+                    ) : (
+                      "Créer une réunion"
+                    )}
                   </Button>
                 </div>
                 
                 <div className="bg-white dark:bg-gray-900 p-8 rounded-xl shadow-md">
                   <h2 className="text-2xl font-semibold mb-6 dark:text-white">Rejoindre une réunion</h2>
-                  <div className="space-y-3">
+                  <form onSubmit={handleJoinMeeting} className="space-y-3">
                     <Input
                       type="text"
                       placeholder="Entrez un code de réunion"
@@ -65,14 +112,21 @@ const Index = () => {
                       className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                     />
                     <Button
-                      onClick={handleJoinMeeting}
+                      type="submit"
                       className="w-full bg-blue-600 hover:bg-blue-700"
                       size="lg"
-                      disabled={!meetingCode.trim()}
+                      disabled={!meetingCode.trim() || isJoining}
                     >
-                      Rejoindre maintenant
+                      {isJoining ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Connexion...
+                        </>
+                      ) : (
+                        "Rejoindre maintenant"
+                      )}
                     </Button>
-                  </div>
+                  </form>
                 </div>
               </div>
             </div>

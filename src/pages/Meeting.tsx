@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -7,8 +8,10 @@ import MeetingControls from "@/components/MeetingControls";
 import VideoTile from "@/components/VideoTile";
 import SimpleChat from "@/components/SimpleChat";
 import SimpleParticipants from "@/components/SimpleParticipants";
-import { peerService } from "@/utils/peerService";
+import { apiClient } from "@/utils/api";
+import { rtcService } from "@/utils/rtcService";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface Message {
   id: string;
@@ -24,12 +27,13 @@ interface Participant {
   isLocal: boolean;
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
+  stream?: MediaStream;
 }
 
 const Meeting = () => {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
-  const { user, isSignedIn } = useAuth();
+  const { user, isSignedIn, isLoading: isAuthLoading } = useAuth();
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -40,69 +44,121 @@ const Meeting = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, { stream: MediaStream, name: string }>>(new Map());
+  const [roomDetails, setRoomDetails] = useState<{ name: string; code: string } | null>(null);
   
-  const lastPeerIdRef = useRef("");
+  const remoteStreamsRef = useRef(new Map<string, MediaStream>());
 
   useEffect(() => {
-    if (!isSignedIn) {
+    if (!isAuthLoading && !isSignedIn) {
       toast.error("Vous devez être connecté pour accéder à une réunion");
       navigate("/");
     }
-  }, [isSignedIn, navigate]);
+  }, [isSignedIn, navigate, isAuthLoading]);
 
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId || !user || !isSignedIn) return;
     
     const initializeMeeting = async () => {
       try {
         setIsLoading(true);
         
-        const userId = user.id;
-        const userName = user.fullName || user.username || "Utilisateur";
+        // Récupérer les détails de la salle
+        const roomResponse = await apiClient.getRoomDetails(roomId);
+        if (roomResponse.success && roomResponse.data) {
+          setRoomDetails(roomResponse.data);
+        }
         
-        const stream = await peerService.initialize(userId, userName);
-        setLocalStream(stream);
-        
-        setParticipants([{
-          id: userId,
-          name: userName,
-          isLocal: true,
-          isAudioEnabled: true,
-          isVideoEnabled: true
-        }]);
-        
-        peerService.onPeerConnected((peerId, peerName, stream) => {
-          setRemoteStreams(prev => {
-            const newMap = new Map(prev);
-            newMap.set(peerId, { stream, name: peerName });
-            return newMap;
-          });
-          
-          setParticipants(prev => [...prev, {
-            id: peerId,
-            name: peerName,
-            isLocal: false,
-            isAudioEnabled: true,
-            isVideoEnabled: true
-          }]);
-          
-          toast.success(`${peerName} a rejoint la réunion`);
+        // Établir la connexion WebRTC
+        const stream = await rtcService.joinRoom(roomId, (error) => {
+          console.error("Erreur lors de la connexion à la salle:", error);
+          toast.error("Impossible de rejoindre la réunion");
+          setTimeout(() => navigate('/'), 3000);
         });
         
-        peerService.onPeerDisconnected((peerId) => {
-          setRemoteStreams(prev => {
-            const newMap = new Map(prev);
-            const peerName = participants.find(p => p.id === peerId)?.name || "Un participant";
-            newMap.delete(peerId);
-            return newMap;
-          });
+        setLocalStream(stream);
+        
+        // Ajouter l'utilisateur local aux participants
+        setParticipants([{
+          id: user.id,
+          name: user.fullName,
+          isLocal: true,
+          isAudioEnabled: true,
+          isVideoEnabled: true,
+          stream
+        }]);
+        
+        // Écouter les événements WebRTC
+        const unsubscribeJoin = rtcService.onParticipantJoin((participant) => {
+          setParticipants(prev => [
+            ...prev.filter(p => p.id !== participant.id),
+            {
+              id: participant.id,
+              name: participant.name,
+              isLocal: false,
+              isAudioEnabled: true,
+              isVideoEnabled: true
+            }
+          ]);
           
-          setParticipants(prev => prev.filter(p => p.id !== peerId));
-          toast.info(`Un participant a quitté la réunion`);
+          toast.success(`${participant.name} a rejoint la réunion`);
+        });
+        
+        const unsubscribeLeave = rtcService.onParticipantLeave((userId) => {
+          setParticipants(prev => prev.filter(p => p.id !== userId));
+          remoteStreamsRef.current.delete(userId);
+          
+          toast.info("Un participant a quitté la réunion");
+        });
+        
+        const unsubscribeStream = rtcService.onRemoteStream((userId, stream, name) => {
+          remoteStreamsRef.current.set(userId, stream);
+          
+          setParticipants(prev => {
+            const existing = prev.find(p => p.id === userId);
+            
+            if (existing) {
+              return prev.map(p => 
+                p.id === userId 
+                  ? { ...p, stream } 
+                  : p
+              );
+            } else {
+              return [
+                ...prev,
+                {
+                  id: userId,
+                  name,
+                  isLocal: false,
+                  isAudioEnabled: true,
+                  isVideoEnabled: true,
+                  stream
+                }
+              ];
+            }
+          });
+        });
+        
+        const unsubscribeMedia = rtcService.onMediaStateChange((userId, video, audio) => {
+          setParticipants(prev => prev.map(p => 
+            p.id === userId 
+              ? { ...p, isVideoEnabled: video, isAudioEnabled: audio } 
+              : p
+          ));
+        });
+        
+        const unsubscribeMessage = rtcService.onMessage((message) => {
+          setMessages(prev => [...prev, message]);
         });
         
         toast.success("Vous avez rejoint la réunion");
+        
+        return () => {
+          unsubscribeJoin();
+          unsubscribeLeave();
+          unsubscribeStream();
+          unsubscribeMedia();
+          unsubscribeMessage();
+        };
       } catch (error) {
         console.error("Error joining room:", error);
         toast.error("Impossible de rejoindre la réunion");
@@ -112,12 +168,13 @@ const Meeting = () => {
       }
     };
     
-    initializeMeeting();
+    const cleanupFn = initializeMeeting();
     
     return () => {
-      peerService.disconnect();
+      rtcService.leaveRoom();
+      cleanupFn?.then(cleanup => cleanup && cleanup());
     };
-  }, [roomId, user, navigate, participants]);
+  }, [roomId, user, navigate, isSignedIn]);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -129,9 +186,9 @@ const Meeting = () => {
     if (isChatOpen) setIsChatOpen(false);
   };
 
-  const handleAudioToggle = async () => {
+  const handleAudioToggle = () => {
     try {
-      await peerService.toggleAudio(!isAudioEnabled);
+      rtcService.toggleAudio(!isAudioEnabled);
       setIsAudioEnabled(!isAudioEnabled);
     } catch (error) {
       console.error("Error toggling audio:", error);
@@ -139,9 +196,9 @@ const Meeting = () => {
     }
   };
 
-  const handleVideoToggle = async () => {
+  const handleVideoToggle = () => {
     try {
-      await peerService.toggleVideo(!isVideoEnabled);
+      rtcService.toggleVideo(!isVideoEnabled);
       setIsVideoEnabled(!isVideoEnabled);
     } catch (error) {
       console.error("Error toggling video:", error);
@@ -150,49 +207,54 @@ const Meeting = () => {
   };
 
   const handleScreenShareToggle = async () => {
-    toast.info("Le partage d'écran n'est pas disponible dans cette version gratuite");
+    try {
+      await rtcService.toggleScreenShare(!isScreenSharing);
+      setIsScreenSharing(!isScreenSharing);
+      
+      if (!isScreenSharing) {
+        toast.success("Partage d'écran activé");
+      } else {
+        toast.info("Partage d'écran désactivé");
+      }
+    } catch (error) {
+      console.error("Error toggling screen share:", error);
+      toast.error("Impossible de partager l'écran");
+    }
   };
 
   const handleSendMessage = (message: string) => {
     if (!message.trim() || !user) return;
     
-    const newMessage: Message = {
-      id: crypto.randomUUID(),
-      senderId: user.id,
-      senderName: user.fullName || user.username || "Utilisateur",
-      text: message,
-      timestamp: new Date()
-    };
+    const success = rtcService.sendMessage(message);
     
-    setMessages(prev => [...prev, newMessage]);
-  };
-
-  const handleJoinPeer = () => {
-    const peerId = prompt("Entrez l'ID du participant à rejoindre:");
-    
-    if (peerId && peerId.trim() && peerId !== user?.id) {
-      lastPeerIdRef.current = peerId.trim();
-      
-      toast.info("Connexion en cours...");
-      
-      peerService.callPeer(peerId.trim())
-        .catch(err => {
-          console.error("Erreur lors de la connexion au pair:", err);
-          toast.error("Impossible de rejoindre ce participant");
-        });
+    if (success) {
+      // Le message sera ajouté au chat via l'écouteur onMessage
     }
   };
 
-  const handleLeaveRoom = async () => {
-    try {
-      peerService.disconnect();
-      navigate("/");
-      toast.info("Vous avez quitté la réunion");
-    } catch (error) {
-      console.error("Error leaving room:", error);
-      toast.error("Impossible de quitter la réunion");
+  const handleCopyRoomCode = () => {
+    if (roomDetails?.code) {
+      navigator.clipboard.writeText(roomDetails.code);
+      toast.success("Code de réunion copié dans le presse-papier");
     }
   };
+
+  const handleLeaveRoom = () => {
+    rtcService.leaveRoom();
+    navigate("/");
+    toast.info("Vous avez quitté la réunion");
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-500 dark:text-gray-400">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isSignedIn) {
     return null;
@@ -205,23 +267,21 @@ const Meeting = () => {
         <div className="flex-1 flex flex-col p-4">
           <div className="mb-4 bg-white dark:bg-gray-900 rounded-lg shadow p-4">
             <div className="flex flex-wrap items-center justify-between">
-              <h2 className="text-xl font-semibold dark:text-white">Réunion: {roomId}</h2>
-              <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                <p className="text-sm dark:text-gray-400">Votre ID: {user?.id}</p>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => {
-                    navigator.clipboard.writeText(user?.id || "");
-                    toast.success("ID copié dans le presse-papier");
-                  }}
-                >
-                  Copier
-                </Button>
-                <Button size="sm" onClick={handleJoinPeer}>
-                  Rejoindre par ID
-                </Button>
-              </div>
+              <h2 className="text-xl font-semibold dark:text-white">
+                {roomDetails?.name || `Réunion: ${roomId?.substring(0, 8)}`}
+              </h2>
+              {roomDetails?.code && (
+                <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                  <p className="text-sm dark:text-gray-400">Code: <span className="font-medium">{roomDetails.code}</span></p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleCopyRoomCode}
+                  >
+                    Copier
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           
@@ -229,6 +289,7 @@ const Meeting = () => {
             <div className="flex-1 bg-white dark:bg-gray-900 rounded-lg shadow p-4 h-full">
               {isLoading ? (
                 <div className="h-full flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin mr-2 text-blue-600" />
                   <p className="text-gray-500 dark:text-gray-400">Connexion à la réunion...</p>
                 </div>
               ) : (
@@ -237,32 +298,34 @@ const Meeting = () => {
                     <div className="aspect-video">
                       <VideoTile
                         stream={localStream}
-                        peerName={user?.fullName || user?.username || "Vous"}
+                        peerName={user?.fullName || "Vous"}
                         isLocal={true}
                         isAudioEnabled={isAudioEnabled}
                       />
                     </div>
                   )}
                   
-                  {Array.from(remoteStreams.entries()).map(([peerId, { stream, name }]) => (
-                    <div key={peerId} className="aspect-video">
-                      <VideoTile
-                        stream={stream}
-                        peerName={name}
-                        isLocal={false}
-                        isAudioEnabled={true}
-                      />
-                    </div>
-                  ))}
+                  {participants
+                    .filter(p => !p.isLocal && p.stream)
+                    .map((participant) => (
+                      <div key={participant.id} className="aspect-video">
+                        <VideoTile
+                          stream={participant.stream!}
+                          peerName={participant.name}
+                          isLocal={false}
+                          isAudioEnabled={participant.isAudioEnabled}
+                        />
+                      </div>
+                    ))}
                   
-                  {remoteStreams.size === 0 && localStream && (
+                  {participants.filter(p => !p.isLocal && p.stream).length === 0 && localStream && (
                     <div className="col-span-full h-full flex items-center justify-center">
                       <div className="text-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
                         <p className="text-gray-500 dark:text-gray-400 mb-4">
                           Aucun autre participant pour le moment
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Partagez votre ID ou invitez des participants à rejoindre avec le code: <span className="font-bold">{roomId}</span>
+                          Invitez des participants à rejoindre avec le code: <span className="font-bold">{roomDetails?.code || 'N/A'}</span>
                         </p>
                       </div>
                     </div>
